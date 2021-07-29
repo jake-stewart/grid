@@ -58,6 +58,7 @@ void Grid::renderGridlines() {
     }
 
     // draw the vertices, with the constructed column line texture
+    _vertex_array.setPrimitiveType(sf::Quads);
     _window.draw(_vertex_array);
     _vertex_array.clear();
 }
@@ -110,6 +111,7 @@ void Grid::renderGridlinesAA() {
         ADD_VERTEX((float)_screen_width, _end_offset,       _aa_color_r);
     }
 
+    _vertex_array.setPrimitiveType(sf::Quads);
     _window.draw(_vertex_array);
     _vertex_array.clear();
 }

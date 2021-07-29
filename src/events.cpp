@@ -50,9 +50,6 @@ void Grid::handleEvents() {
 }
 
 void Grid::onStart() {
-    int x, y, radius;
-    float density;
-
     for (int y = 5; y < 100; y += 5) {
         for (int x = 0; x < 100; x += 1) {
             drawCell(x, y, 100, 100, 100);
@@ -63,20 +60,6 @@ void Grid::onStart() {
             drawCell(x, y, 100, 100, 100);
         }
     }
-
-    // drawCell( 0,  0, 255, 255, 255);
-    // drawCell( 1,  0, 128, 128, 128);
-    // drawCell(-1,  0, 128, 128, 128);
-    // drawCell( 0,  1, 128, 128, 128);
-    // drawCell( 0, -1, 128, 128, 128);
-    // drawCell( 1,  1,  64,  64,  64);
-    // drawCell( 1, -1,  64,  64,  64);
-    // drawCell(-1,  1,  64,  64,  64);
-    // drawCell(-1, -1,  64,  64,  64);
-    // drawCell( 2,  0,  32,  32,  32);
-    // drawCell(-2,  0,  32,  32,  32);
-    // drawCell( 0,  2,  32,  32,  32);
-    // drawCell( 0, -2,  32,  32,  32);
 }
 
 void Grid::onResize(unsigned int new_width, unsigned int new_height) {

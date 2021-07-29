@@ -1,5 +1,8 @@
 #include <SFML/Graphics.hpp>
+#include <iostream>
 #include "grid.h"
+
+#define ADD_VERTEX(x, y, color) _vertex_array.append(sf::Vertex({x, y}, color))
 
 void Grid::setScale(float scale) {
     // calculate how many cells would be visible at the new scale
@@ -101,26 +104,16 @@ int Grid::start() {
 }
 
 sf::Color Grid::getCell(int x, int y) {
-    std::unordered_map<int, std::unordered_map<int, std::unordered_map
-        <int, sf::Uint8[4]>>>::const_iterator
-    col_iter = _columns.find(x);
+    auto col_iter = _columns.find(x);
 
     if (col_iter != _columns.end()) {
-        std::unordered_map<int, std::unordered_map
-            <int, sf::Uint8[4]>>::const_iterator
-        chunk_iter = col_iter->second.find(y / _chunk_size);
+        auto chunk_iter = col_iter->second.find(y / _chunk_size);
 
         if (chunk_iter != col_iter->second.end()) {
-            std::unordered_map<int, sf::Uint8[4]>::const_iterator
-            cell_iter = chunk_iter->second.find(y);
+            auto cell_iter = chunk_iter->second.find(y);
 
-            if (cell_iter != chunk_iter->second.end()) {
-                return sf::Color{
-                    cell_iter->second[0],
-                    cell_iter->second[1],
-                    cell_iter->second[2]
-                };
-            }
+            if (cell_iter != chunk_iter->second.end())
+                return cell_iter->second;
         }
     }
 
@@ -128,59 +121,20 @@ sf::Color Grid::getCell(int x, int y) {
 }
 
 void Grid::drawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g) {
-    int chunk_x = x / _chunk_size;
-    int chunk_y = y / _chunk_size;
-
-    sf::Uint8 * cell;
-    cell = _columns[x][chunk_y][y];
-    cell[0] = r;
-    cell[1] = g;
-    cell[2] = b;
-    cell[3] = 255;
-
-    cell = _rows[y][chunk_x][x];
-    cell[0] = r;
-    cell[1] = g;
-    cell[2] = b;
-    cell[3] = 255;
-
-    if (_col_start <= x && x <= _col_end && _row_start <= y && y <= _row_end) {
-        int blit_x = x % _grid_texture_width;
-        if (blit_x < 0) blit_x += _grid_texture_width;
-
-        int blit_y = y % _grid_texture_height;
-        if (blit_y < 0) blit_y += _grid_texture_height;
-
-        _grid_texture.update(&cell[0], 1, 1, blit_x, blit_y);
-        _screen_changed = true;
-    }
+    drawCell(x, y, sf::Color{r, g, b});
 }
 
 void Grid::drawCell(int x, int y, sf::Color color) {
-    int chunk_x = x / _chunk_size;
-    int chunk_y = y / _chunk_size;
-
-    sf::Uint8 * cell;
-    cell = _columns[x][chunk_y][y];
-    cell[0] = color.r;
-    cell[1] = color.g;
-    cell[2] = color.b;
-    cell[3] = 255;
-
-    cell = _rows[y][chunk_x][x];
-    cell[0] = color.r;
-    cell[1] = color.g;
-    cell[2] = color.b;
-    cell[3] = 255;
+    _columns[x][y / _chunk_size][y] = color;
+    _rows[y][x / _chunk_size][x] = color;
 
     if (_col_start <= x && x <= _col_end && _row_start <= y && y <= _row_end) {
-        int blit_x = x % _grid_texture_width;
+        float blit_x = x % _grid_texture_width + 0.5;
         if (blit_x < 0) blit_x += _grid_texture_width;
 
-        int blit_y = y % _grid_texture_height;
+        float blit_y = y % _grid_texture_height + 0.5;
         if (blit_y < 0) blit_y += _grid_texture_height;
 
-        _grid_texture.update(&cell[0], 1, 1, blit_x, blit_y);
-        _screen_changed = true;
+        ADD_VERTEX(blit_x, blit_y, color);
     }
 }

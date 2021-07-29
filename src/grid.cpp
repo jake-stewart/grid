@@ -14,20 +14,20 @@
 
 // TODO
 // [x] only drawIntroducedCells() once per frame
-// [x] comments + cleanup
 // [x] split into multiple files (cleaner?)
 // [x] don't redraw intersections of rows/columns
 // [x] gridlines + grid effects
 // [x] grid pan velocity
 // [x] universal delta time (avoid things being faster when higher fps)
-// [ ] cell deletion
 // [x] cleanup events
 // [x] cleanup draw rows/columns
 // [x] animations
-// [ ] rect cell draw/deletion
 // [x] zoom limits
 // [x] resizing
-// [ ] extendability + threading
+// [ ] rect cell draw use clearArea()
+// [ ] comments + cleanup
+// [ ] cell deletion
+// [ ] extendability
 
 Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
     _title = title;
@@ -57,7 +57,7 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
     _weak_pan_friction = 5;
     _strong_pan_friction = 20;
 
-
+    _scale = scale;
     _max_scale = 300;
     _min_scale = 2;
 
@@ -74,10 +74,6 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
 
     _grid_default_max_alpha = 255;
     _grid_max_alpha = _grid_default_max_alpha;
-
-    setScale(scale);
-    setGridThickness(0.08);
-    setGridlinesFade(7, 20);
 }
 
 int Grid::initialize() {
@@ -99,7 +95,7 @@ int Grid::initialize() {
     _max_cells_x = _grid_texture_width - 2;
     _max_cells_y = _grid_texture_height - 2;
     _grid_texture.create(_grid_texture_width, _grid_texture_height);
-    _grid_sprite.setTexture(_grid_texture);
+    _grid_sprite.setTexture(_grid_texture.getTexture());
 
     // when the grid is panned beyond the bounds of the grid texture,
     // the cells are wrapped to the other side of the texture.
@@ -108,10 +104,10 @@ int Grid::initialize() {
     _grid_texture.setRepeated(true);
 
     // pixel which are manipulated before being used to update the grid texture
-    int n_pixels = _grid_texture_width * _grid_texture_height * 4;
-    _pixels = new sf::Uint8[n_pixels];
-    for (int i = 0; i < n_pixels; i++)
-        _pixels[i] = 255;
+    // int n_pixels = _grid_texture_width * _grid_texture_height * 4;
+    // _pixels = new sf::Uint8[n_pixels];
+    // for (int i = 0; i < n_pixels; i++)
+    //     _pixels[i] = 255;
 
     const char * shader_source =
         "#version 130\n"
@@ -128,12 +124,16 @@ int Grid::initialize() {
 
     if (sf::Shader::isAvailable()) {
         _shader.loadFromMemory(shader_source, sf::Shader::Fragment);
-        _shader.setUniform("tex", _grid_texture);
+        _shader.setUniform("tex", _grid_texture.getTexture());
         _shader.setUniform("geometry", sf::Vector2f(_grid_texture_width, _grid_texture_height));
         _antialias_enabled = true;
     }
 
     _grid_texture.setSmooth(_antialias_enabled);
+
+    setScale(_scale);
+    setGridThickness(0.08);
+    setGridlinesFade(7, 20);
 
     return 0;
 }
@@ -161,11 +161,21 @@ void Grid::mainloop() {
                 .asSeconds() > _t_per_mouse_pos)
             recordMousePos();
 
+
+        if (_vertex_array.getVertexCount()) {
+            _screen_changed = true;
+        }
+
         if (_screen_changed) {
             _screen_changed = false;
             drawIntroducedCells();
             _window.clear();
             animateCells(delta_time);
+
+            _vertex_array.setPrimitiveType(sf::Points);
+            _grid_texture.draw(_vertex_array);
+            _vertex_array.clear();
+
             render();
 
             if (_display_grid && _grid_thickness > 0) {

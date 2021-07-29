@@ -1,7 +1,10 @@
 #include <SFML/Graphics.hpp>
+#include <iostream>
 #include <unordered_map>
 #include <math.h>
 #include "grid.h"
+
+#define ADD_VERTEX(x, y, color) _vertex_array.append(sf::Vertex({x, y}, color))
 
 using std::unordered_map;
 
@@ -19,17 +22,21 @@ void Grid::calcGridSize() {
 }
 
 void Grid::render() {
+    _grid_texture.display();
     _grid_sprite.setScale(_scale, _scale);
 
     _grid_sprite.setTextureRect({
         _cam_x % _grid_texture_width,
         _cam_y % _grid_texture_height,
         _n_visible_cols,
-        _n_visible_rows
+        _n_visible_rows 
     });
 
     _blit_x_offset = (-1 + (1 - _cam_x_decimal)) * _scale;
     _blit_y_offset = (-1 + (1 - _cam_y_decimal)) * _scale;
+
+    sf::Rect<int> rect = _grid_sprite.getTextureRect();
+
     _grid_sprite.setPosition(_blit_x_offset, _blit_y_offset);
 
     if (_antialias_enabled) {
@@ -99,160 +106,108 @@ void Grid::drawIntroducedCells() {
 }
 
 void Grid::drawRows(int y, int n_rows, int x, int n_cols) {
-    // calculate where on the grid texture the columns will be drawn
-    int blit_y = y % _grid_texture_height;
-    if (blit_y < 0) blit_y += _grid_texture_height;
-
-    int blit_x = x % _grid_texture_width;
-    if (blit_x < 0) blit_x += _grid_texture_width;
-
-    // if the columns extend beyond the grid texture, then the
-    // extra columns will be drawn at the start of the texture
-    if (blit_x + n_cols > _grid_texture_width) {
-        int excess_cols = (blit_x + n_cols) - _grid_texture_width;
-        n_cols -= excess_cols;
-        drawRows(y, n_rows, x + n_cols, excess_cols);
-    }
-
-    // the pixels, which will be used to draw cells before being sent
-    // to the graphics card must be cleared to be the background color
-    clearPixels(n_rows, n_cols);
-
-    unordered_map<int, unordered_map<int, unordered_map
-        <int, sf::Uint8[4]>>>::const_iterator row_iter;
-
-    unordered_map<int, unordered_map<int, sf::Uint8[4]>>
-        ::const_iterator chunk_iter;
+    clearArea(x, y, n_cols, n_rows);
 
     int chunk_start_idx = x / _chunk_size;
     int chunk_end_idx = chunk_start_idx + ceil(n_cols / (float)_chunk_size) + 1;
-    int chunk_idx;
 
-    // variables used to calculate where in the pixel array a cell belongs
-    int cell_idx;
-    int y_offset = 0;
-    int row_size = n_cols * 4;
-
-    // for every row, iterate over every visible chunk within that row
-    // for every chunk, iterate over every cell contained within that chunk
-    // for every cell, add it to the pixel array
     for (int y_idx = y; y_idx < y + n_rows; y_idx++) {
-        row_iter = _rows.find(y_idx);
+        auto row_iter = _rows.find(y_idx);
+
+        float cell_y = y_idx % _grid_texture_height + 0.5;
+        if (cell_y < 0) cell_y += _grid_texture_height;
 
         if (row_iter != _rows.end()) {
-            for (chunk_idx = chunk_start_idx; chunk_idx < chunk_end_idx; chunk_idx++) {
-                chunk_iter = row_iter->second.find(chunk_idx);
+            for (int chunk_idx = chunk_start_idx; chunk_idx < chunk_end_idx; chunk_idx++) {
+                auto chunk_iter = row_iter->second.find(chunk_idx);
                 if (chunk_iter == row_iter->second.end())
                     continue;
 
                 for (auto& cell: chunk_iter->second) {
-                    cell_idx = cell.first - x;
-                    if (cell_idx < 0 || cell_idx >= n_cols)
+                    if (cell.first < x || cell.first >= x + n_cols)
                         continue;
 
-                    cell_idx = cell_idx * 4 + y_offset;
-                    _pixels[cell_idx] = cell.second[0];
-                    _pixels[cell_idx + 1] = cell.second[1];
-                    _pixels[cell_idx + 2] = cell.second[2];
+                    float cell_x = cell.first % _grid_texture_width + 0.5;
+                    if (cell_x < 0) cell_x += _grid_texture_width;
+
+                    ADD_VERTEX(cell_x, cell_y, cell.second);
                 }
             }
         }
-        y_offset += row_size;
     }
-
-    // use generated pixels to update the grid texture
-    updateTexture(blit_x, blit_y, n_rows, n_cols);
 }
 
 void Grid::drawColumns(int x, int n_cols) {
-    // calculate where on the grid texture the columns will be drawn
-    int blit_x = x % _grid_texture_width;
-    if (blit_x < 0) blit_x += _grid_texture_width;
-
-    int blit_y = _cam_y % _grid_texture_height;
-    if (blit_y < 0) blit_y += _grid_texture_height;
-
-    // if the columns extend beyond the grid texture, then the
-    // extra columns will be drawn at the start of the texture
-    if (blit_x + n_cols > _grid_texture_width) {
-        int excess_cols = (blit_x + n_cols) - _grid_texture_width;
-        n_cols -= excess_cols;
-        drawColumns(x + n_cols, excess_cols);
-    }
-
-    // the pixels, which will be used to draw cells before being sent
-    // to the graphics card must be cleared to be the background color
-    clearPixels(n_cols, _n_visible_rows);
-
-    unordered_map<int, unordered_map<int, unordered_map
-        <int, sf::Uint8[4]>>>::const_iterator col_iter;
-
-    unordered_map<int, unordered_map<int, sf::Uint8[4]>>
-        ::const_iterator chunk_iter;
+    clearArea(x, _cam_y, n_cols, _n_visible_rows);
 
     int chunk_start_idx = _cam_y / _chunk_size;
     int chunk_end_idx = chunk_start_idx + ceil(_n_visible_rows / (float)_chunk_size) + 1;
-    int chunk_idx;
 
-    // variables used to calculate where in the pixel array a cell belongs
-    int cell_idx;
-    int x_offset = 0;
-    int row_size = n_cols * 4;
-
-    // for every column, iterate over every visible chunk within that column
-    // for every chunk, iterate over every cell contained within that chunk
-    // for every cell, add it to the pixel array
     for (int x_idx = x; x_idx < x + n_cols; x_idx++) {
-        col_iter = _columns.find(x_idx);
+        auto col_iter = _columns.find(x_idx);
+
+        float cell_x = x_idx % _grid_texture_width + 0.5;
+        if (cell_x < 0) cell_x += _grid_texture_width;
 
         if (col_iter != _columns.end()) {
-            for (chunk_idx = chunk_start_idx; chunk_idx < chunk_end_idx; chunk_idx++) {
-                chunk_iter = col_iter->second.find(chunk_idx);
+            for (int chunk_idx = chunk_start_idx; chunk_idx < chunk_end_idx; chunk_idx++) {
+                auto chunk_iter = col_iter->second.find(chunk_idx);
                 if (chunk_iter == col_iter->second.end())
                     continue;
 
                 for (auto& cell: chunk_iter->second) {
-                    cell_idx = (cell.first - _cam_y);
-                    if (cell_idx < 0 || cell_idx >= _n_visible_rows) continue;
-                    cell_idx = cell_idx * row_size + x_offset;
-                    _pixels[cell_idx] = cell.second[0];
-                    _pixels[cell_idx + 1] = cell.second[1];
-                    _pixels[cell_idx + 2] = cell.second[2];
+                    if (cell.first < _cam_y || cell.first >= _cam_y + _n_visible_rows)
+                        continue;
+
+                    float cell_y = cell.first % _grid_texture_height + 0.5;
+                    if (cell_y < 0) cell_y += _grid_texture_height;
+
+                    ADD_VERTEX(cell_x, cell_y, cell.second);
                 }
             }
         }
-        x_offset += 4;
-    }
-
-    // use generated pixels to update the grid texture
-    updateTexture(blit_x, blit_y, _n_visible_rows, n_cols);
-}
-
-
-void Grid::clearPixels(int n_rows, int n_cols) {
-    int pixels_size = n_rows * n_cols * 4;
-
-    for (int i = 0; i < pixels_size; i += 4) {
-        _pixels[i] = _background_color.r;
-        _pixels[i + 1] = _background_color.g;
-        _pixels[i + 2] = _background_color.b;
     }
 }
 
-void Grid::updateTexture(int blit_x, int blit_y, int n_rows, int n_cols) {
-    // if the pixels extend beyond the grid texture's height,
-    // then the excess pixels will need to be wrapped to the start
-    // of the texture
-    if (blit_y + n_rows > _grid_texture_height) {
-        int n = n_rows - ((blit_y + n_rows) - _grid_texture_height);
-        _grid_texture.update(_pixels, n_cols, n, blit_x, blit_y);
-        _grid_texture.update(
-            &_pixels[n * n_cols * 4],
-            n_cols, n_rows - n, blit_x, 0
-        );
-    }
-    else {
-        // otherwise, the pixels can be updated all at once
-        _grid_texture.update(_pixels, n_cols, n_rows, blit_x, blit_y);
+
+void Grid::clearArea(int x, int y, int n_cols, int n_rows) {
+    x %= _grid_texture_width;
+    if (x < 0) x += _grid_texture_width;
+
+    y %= _grid_texture_height;
+    if (y < 0) y += _grid_texture_height;
+
+    sf::RectangleShape rect;
+    rect.setFillColor(_background_color);
+
+    int start_y = y;
+    int start_n_rows = n_rows;
+
+    while (n_cols) {
+        float cols_fit;
+        if (x + n_cols > _grid_texture_width)
+            cols_fit = _grid_texture_width - x;
+        else
+            cols_fit = n_cols;
+
+        y = start_y;
+        n_rows = start_n_rows;
+        while (n_rows) {
+            float rows_fit;
+            if (y + n_rows > _grid_texture_height)
+                rows_fit = _grid_texture_height - y;
+            else
+                rows_fit = n_rows;
+
+            rect.setPosition(x, y);
+            rect.setSize({cols_fit, rows_fit});
+            _grid_texture.draw(rect);
+
+            n_rows -= rows_fit;
+            y = 0;
+        }
+
+        n_cols -= cols_fit;
+        x = 0;
     }
 }
