@@ -60,6 +60,7 @@ public:
 
     // animations.cpp
     void drawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g, float anim_duration);
+    void drawCell(int x, int y, sf::Color, float anim_duration);
 
 private:
     bool _stress_test;
@@ -109,8 +110,8 @@ private:
     // screen's top left corner coordinates of grid
     int _cam_x = 0;
     int _cam_y = 0;
-    float _cam_x_decimal = 0;
-    float _cam_y_decimal = 0;
+    float _cam_x_decimal = 0.5;
+    float _cam_y_decimal = 0.5;
     float _blit_x_offset;
     float _blit_y_offset;
 
@@ -169,13 +170,13 @@ private:
     // _column[chunk_index][y] = {r, g, b, a}
     // when drawing a row or column, the chunks are iterated over, instead of individual rows.
     // then, each cell of the chunk is iterated over. this allows for empty pixels to be ignored.
-    std::unordered_map<int, std::unordered_map<int, std::unordered_map<int, sf::Uint8[4]>>> _columns;
-    std::unordered_map<int, std::unordered_map<int, std::unordered_map<int, sf::Uint8[4]>>> _rows;
+    std::unordered_map<int, std::unordered_map<int, std::unordered_map<int, sf::Color>>> _columns;
+    std::unordered_map<int, std::unordered_map<int, std::unordered_map<int, sf::Color>>> _rows;
 
     // a pixel buffer for drawing rows/columns. these pixels are used to update the grid texture
     // the grid texture is located in graphics memory, so the pixels should not be edited directly,
     // since calls are slow.
-    sf::Uint8 * _pixels;
+    // sf::Uint8 * _pixels;
 
     // solarized
     // sf::Color _background_color{0x00, 0x2b, 0x36};
@@ -237,7 +238,7 @@ private:
     int _mouse_pos_idx = 0;
 
     // grid texture stored on graphics card for quicker rendering
-    sf::Texture _grid_texture;
+    sf::RenderTexture _grid_texture;
 
     sf::VertexArray _vertex_array;
 
@@ -264,7 +265,7 @@ private:
 
     // grid.cpp
     void render();
-    void clearPixels(int n_rows, int n_cols);
+    void clearArea(int x, int y, int n_cols, int n_rows);
     void calcGridSize();
     void drawIntroducedCells();
     void drawRows(int y, int n_rows, int x, int n_cols);
