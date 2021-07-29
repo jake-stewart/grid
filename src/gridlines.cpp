@@ -2,8 +2,6 @@
 #include "grid.h"
 
 #define ADD_VERTEX(x, y, color) _vertex_array.append(sf::Vertex({x, y}, color))
-#define ADD_VERTEX_TEX(x, y, color, tx, ty) _vertex_array.append(sf::Vertex({x, y}, color, {tx, ty}))
-#define ADD_VERTEX_LINE(x, y) _line_array.append(sf::Vertex({x, y}));
 
 void Grid::applyGridEffects() {
     // if cells have not begun fading in yet, or gridlines are disabled,
@@ -44,47 +42,23 @@ void Grid::renderGridlines() {
     int t = _grid_thickness;
     float start_y = _blit_y_offset - t / 2;
     float start_x = _blit_x_offset - t / 2;
-    float blit_x, blit_y;
-
-    int texture_height = _column_rendertex.getSize().y;
-    if (texture_height < _screen_height) {
-        while (texture_height < _screen_height)
-            texture_height *= 2;
-
-        _column_rendertex.create(1, texture_height);
-    }
-
-    _column_rendertex.clear(sf::Color{0, 0, 0, 0});
 
     for (float y = start_y; y < _screen_height; y += _scale) {
-        blit_y = round(y);
-
-        ADD_VERTEX(0,                    blit_y,     _gridline_color);
-        ADD_VERTEX(0,                    blit_y + t, _gridline_color);
-        ADD_VERTEX((float)_screen_width, blit_y + t, _gridline_color);
-        ADD_VERTEX((float)_screen_width, blit_y,     _gridline_color);
-
-        // at the same time, continue constructing the column lines with gaps
-        ADD_VERTEX_LINE(1, blit_y + t);
-        ADD_VERTEX_LINE(1, round(y + _scale));
+        ADD_VERTEX(0,                    y,     _gridline_color);
+        ADD_VERTEX(0,                    y + t, _gridline_color);
+        ADD_VERTEX((float)_screen_width, y + t, _gridline_color);
+        ADD_VERTEX((float)_screen_width, y,     _gridline_color);
     }
 
-    _window.draw(_vertex_array);
-    _vertex_array.clear();
-
-    _column_rendertex.draw(_line_array);
-    _column_rendertex.display();
-    _line_array.clear();
-
     for (float x = start_x; x < _screen_width; x += _scale) {
-        ADD_VERTEX_TEX(x,     0,                     _gridline_color, 0, 0);
-        ADD_VERTEX_TEX(x + t, 0,                     _gridline_color, 1, 0);
-        ADD_VERTEX_TEX(x + t, (float)_screen_height, _gridline_color, 1, (float)_screen_height);
-        ADD_VERTEX_TEX(x,     (float)_screen_height, _gridline_color, 0, (float)_screen_height);
+        ADD_VERTEX(x,     0,                     _gridline_color);
+        ADD_VERTEX(x + t, 0,                     _gridline_color);
+        ADD_VERTEX(x + t, (float)_screen_height, _gridline_color);
+        ADD_VERTEX(x,     (float)_screen_height, _gridline_color);
     }
 
     // draw the vertices, with the constructed column line texture
-    _window.draw(_vertex_array, &_column_rendertex.getTexture());
+    _window.draw(_vertex_array);
     _vertex_array.clear();
 }
 

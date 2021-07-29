@@ -1,5 +1,6 @@
 #include <SFML/Graphics.hpp>
 #include <math.h>
+#include <iostream>
 #include "grid.h"
 
 #define RAND() static_cast <float> (rand()) / static_cast <float> (RAND_MAX)
@@ -22,49 +23,81 @@
 // [ ] cell deletion
 // [x] cleanup events
 // [x] cleanup draw rows/columns
-// [ ] animations
+// [x] animations
 // [ ] rect cell draw/deletion
 // [x] zoom limits
 // [x] resizing
 // [ ] extendability + threading
 
-void Grid::randomCircle(float center_x, float center_y, float radius, float density) {
-    float theta;
-    int n_cells = density * (M_PI * (radius * radius));
-    sf::Uint8 r, g, b;
+Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
+    _title = title;
+    _screen_width = scale * n_cols;
+    _screen_height = scale * n_rows;
 
-    int x, y;
+    _stress_test = false;
 
-    for (int i = 0; i < n_cells; i++) {
+    _chunk_size = 32;
+    _grid_fading = 0;
+    _grid_fade_duration = 0.15;
 
-        r = radius * sqrt(RAND());
-        theta = RAND() * 2 * M_PI;
+    _antialias_enabled = true;
 
-        x = center_x + r * cos(theta);
-        y = center_y + r * sin(theta);
+    _grid_texture_width = 2048;
+    _grid_texture_height = 2048;
 
-        // r = randint(30, 100);
-        // g = randint(30, 100);
-        // b = randint(30, 100);
-        r = 50;
-        g = 50;
-        b = 50;
+    _display_grid = true;
+    _timer_interval = 1;
 
-        addCell(x, y, r, g, b);
-    }
+    _t_per_mouse_pos = 0.01;
+
+    _max_fps = 150;
+
+    _pan_button = sf::Mouse::Middle;
+    _min_pan_vel = 1;
+    _weak_pan_friction = 5;
+    _strong_pan_friction = 20;
+
+
+    _max_scale = 300;
+    _min_scale = 2;
+
+    _zoom_friction = 5;
+    _zoom_speed = 1;
+    _min_zoom_vel = 0.01;
+
+    _zoom_bounce_duration = 0.2;
+
+    _background_color = sf::Color{0x1b, 0x1b, 0x1b};
+    _gridline_color = sf::Color{0x44, 0x44, 0x44};
+    _aa_color_l = _gridline_color;
+    _aa_color_r = _gridline_color;
+
+    _grid_default_max_alpha = 255;
+    _grid_max_alpha = _grid_default_max_alpha;
+
+    setScale(scale);
+    setGridThickness(0.08);
+    setGridlinesFade(7, 20);
 }
 
 int Grid::initialize() {
     _window.create(sf::VideoMode(_screen_width, _screen_height), _title);
-    _window.setFramerateLimit(_max_fps); // FPS
+    if (!_stress_test)
+        _window.setFramerateLimit(_max_fps);
 
     _view = _window.getDefaultView();
 
     // vertices used for batch drawing multiple grid lines efficiently
     _vertex_array.setPrimitiveType(sf::Quads);
-    _line_array.setPrimitiveType(sf::Lines);
 
     // texture stored in graphics memory where each pixel is a cell
+    int max_size = sf::Texture::getMaximumSize();
+    if (max_size < _grid_texture_width || max_size < _grid_texture_height) {
+        _grid_texture_width = max_size;
+        _grid_texture_height = max_size;
+    }
+    _max_cells_x = _grid_texture_width - 2;
+    _max_cells_y = _grid_texture_height - 2;
     _grid_texture.create(_grid_texture_width, _grid_texture_height);
     _grid_sprite.setTexture(_grid_texture);
 
@@ -73,19 +106,12 @@ int Grid::initialize() {
     // setting the texture to be repeated allows for the texture to automatically
     // wrap when rendering
     _grid_texture.setRepeated(true);
-    _grid_texture.setSmooth(_antialias_enabled);
 
     // pixel which are manipulated before being used to update the grid texture
     int n_pixels = _grid_texture_width * _grid_texture_height * 4;
     _pixels = new sf::Uint8[n_pixels];
     for (int i = 0; i < n_pixels; i++)
         _pixels[i] = 255;
-
-    // since row and column lines intersect, the column lines are drawn
-    // with gaps where the intersections would occur.
-    // to make this efficient, one column line is created and then this
-    // line is used for each column
-    _column_rendertex.create(1, _screen_height);
 
     const char * shader_source =
         "#version 130\n"
@@ -100,9 +126,14 @@ int Grid::initialize() {
         "    frag_color = texture(tex, uv / geometry);"
         "}";
 
-    _shader.loadFromMemory(shader_source, sf::Shader::Fragment);
-    _shader.setUniform("tex", _grid_texture);
-    _shader.setUniform("geometry", sf::Vector2f(_grid_texture_width, _grid_texture_height));
+    if (sf::Shader::isAvailable()) {
+        _shader.loadFromMemory(shader_source, sf::Shader::Fragment);
+        _shader.setUniform("tex", _grid_texture);
+        _shader.setUniform("geometry", sf::Vector2f(_grid_texture_width, _grid_texture_height));
+        _antialias_enabled = true;
+    }
+
+    _grid_texture.setSmooth(_antialias_enabled);
 
     return 0;
 }
@@ -134,6 +165,7 @@ void Grid::mainloop() {
             _screen_changed = false;
             drawIntroducedCells();
             _window.clear();
+            animateCells(delta_time);
             render();
 
             if (_display_grid && _grid_thickness > 0) {

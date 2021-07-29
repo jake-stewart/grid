@@ -1,4 +1,5 @@
 #include <SFML/Graphics.hpp>
+#include <iostream>
 #include "grid.h"
 
 void Grid::handleEvents() {
@@ -52,32 +53,30 @@ void Grid::onStart() {
     int x, y, radius;
     float density;
 
-    randomCircle(-50, -50, 100, 0.5);
-
     for (int y = 5; y < 100; y += 5) {
         for (int x = 0; x < 100; x += 1) {
-            addCell(x, y, 100, 100, 100);
+            drawCell(x, y, 100, 100, 100);
         }
     }
     for (int x = 5; x < 100; x += 5) {
         for (int y = 0; y < 100; y += 1) {
-            addCell(x, y, 100, 100, 100);
+            drawCell(x, y, 100, 100, 100);
         }
     }
 
-    addCell( 0,  0, 255, 255, 255);
-    addCell( 1,  0, 128, 128, 128);
-    addCell(-1,  0, 128, 128, 128);
-    addCell( 0,  1, 128, 128, 128);
-    addCell( 0, -1, 128, 128, 128);
-    addCell( 1,  1,  64,  64,  64);
-    addCell( 1, -1,  64,  64,  64);
-    addCell(-1,  1,  64,  64,  64);
-    addCell(-1, -1,  64,  64,  64);
-    addCell( 2,  0,  32,  32,  32);
-    addCell(-2,  0,  32,  32,  32);
-    addCell( 0,  2,  32,  32,  32);
-    addCell( 0, -2,  32,  32,  32);
+    // drawCell( 0,  0, 255, 255, 255);
+    // drawCell( 1,  0, 128, 128, 128);
+    // drawCell(-1,  0, 128, 128, 128);
+    // drawCell( 0,  1, 128, 128, 128);
+    // drawCell( 0, -1, 128, 128, 128);
+    // drawCell( 1,  1,  64,  64,  64);
+    // drawCell( 1, -1,  64,  64,  64);
+    // drawCell(-1,  1,  64,  64,  64);
+    // drawCell(-1, -1,  64,  64,  64);
+    // drawCell( 2,  0,  32,  32,  32);
+    // drawCell(-2,  0,  32,  32,  32);
+    // drawCell( 0,  2,  32,  32,  32);
+    // drawCell( 0, -2,  32,  32,  32);
 }
 
 void Grid::onResize(unsigned int new_width, unsigned int new_height) {
@@ -147,6 +146,7 @@ void Grid::onWindowClose() {
 }
 
 void Grid::onTimer() {
-    // print("FPS:", _n_frames);
+    if (_stress_test)
+        std::cout << "FPS: " << _n_frames << std::endl;
     _n_frames = 0;
 }
