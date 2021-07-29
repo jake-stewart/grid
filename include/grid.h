@@ -6,14 +6,51 @@
 #include <vector>
 #include <math.h>
 
-using std::unordered_map;
+struct Coord
+{
+    int x;
+    int y;
+ 
+    // constructor
+    Coord(int x, int y)
+    {
+        this->x = x;
+        this->y = y;
+    }
+ 
+    // `operator==` is required to compare keys in case of a hash collision
+    bool operator==(const Coord &coord) const {
+        return x == coord.x && y == coord.y;
+    }
+};
+ 
+// The specialized hash function for `unordered_map` keys
+struct hash_fn
+{
+    std::size_t operator() (const Coord &node) const
+    {
+        std::size_t h1 = std::hash<int>()(node.x);
+        std::size_t h2 = std::hash<int>()(node.y);
+ 
+        return h1 ^ h2;
+    }
+};
+
+struct AnimatedCell {
+    sf::Color start_color;
+    sf::Color end_color;
+    float anim_progress;
+    float anim_duration;
+};
 
 class Grid {
 public:
     // interface.cpp
     Grid(const char * title, int n_cols, int n_rows, float scale);
     int start();
-    void addCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g);
+    void drawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g);
+    void drawCell(int x, int y, sf::Color color);
+    sf::Color getCell(int x, int y);
     void setScale(float scale);
     void setGridThickness(float value);
     void setGridlinesFade(float start_scale, float end_scale);
@@ -21,28 +58,40 @@ public:
     void toggleGridlines();
     void useAntialiasing(bool value);
 
-private:
-    int _chunk_size = 32;
-    int _grid_fading = 0;
-    float _grid_fade_duration = 0.15;
+    // animations.cpp
+    void drawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g, float anim_duration);
 
-    bool _antialias_enabled = true;
+private:
+    bool _stress_test;
+
+    int _chunk_size;
+    int _grid_fading;
+    float _grid_fade_duration;
+
+    bool _antialias_enabled;
 
     const char * _title;
 
+    std::unordered_map<Coord, AnimatedCell, hash_fn> _animated_cells;
+
     sf::Shader _shader;
 
-    // int _grid_texture_width = 256;
-    // int _grid_texture_height = 256;
-    int _grid_texture_width = 3840;
-    int _grid_texture_height = 2160;
-
-    int _max_cells_x = _grid_texture_width - 2;
-    int _max_cells_y = _grid_texture_height - 2;
+    int _grid_texture_width;
+    int _grid_texture_height;
+    int _max_cells_x;
+    int _max_cells_y;
 
     // mouse button used for panning/dragging screen
-    int _pan_button = sf::Mouse::Middle;
+    int _pan_button = -1;
     bool _pan_button_pressed = false;
+
+    bool _left_mouse_pressed = false;
+    bool _right_mouse_pressed = false;
+
+    // TODO: rename
+    int _fill_x;
+    int _mouse_cell_x = 0;
+    int _mouse_cell_y = 0;
 
     // last mouse location on screen
     int _mouse_x = 0;
@@ -51,9 +100,10 @@ private:
     // visible row geometry
     int _n_visible_rows = 0;
     int _n_visible_cols = 0;
-    int _screen_width, _screen_height;
+    int _screen_width;
+    int _screen_height;
 
-    int _max_fps = 160;
+    int _max_fps;
     int _n_frames = 0;
 
     // screen's top left corner coordinates of grid
@@ -74,11 +124,11 @@ private:
 
     // pan velocity decreases faster once the user has clicked the screen
     // to drag again. stopping the velocity instantly can be jarring
-    float _weak_pan_friction = 5;
-    float _strong_pan_friction = 20;
+    float _weak_pan_friction;
+    float _strong_pan_friction;
     float _pan_friction;
 
-    float _min_pan_vel = 1;
+    float _min_pan_vel;
 
     // introduced cells should be drawn altogether once per frame.
     // this way, the grid can zoom, pan, and resize multiple times without
@@ -89,17 +139,17 @@ private:
     // min and max scale determine cell size limits. cell size < 1 is possible but
     // causes jitteriness when panning (also very computationally expensive because
     // of how many cells have to be drawn)
-    float _scale = 10;
-    float _max_scale = 300;
-    float _min_scale = 2;
+    float _scale;
+    float _max_scale;
+    float _min_scale;
 
     float _zoom_vel = 0;
     int _zoom_x = 0;
     int _zoom_y = 0;
 
-    float _zoom_friction = 5;
-    float _zoom_speed = 1;
-    float _min_zoom_vel = 0.01;
+    float _zoom_friction;
+    float _zoom_speed;
+    float _min_zoom_vel;
 
     // when you zoom beyond the min/max cell size, the scale bounces back
     // these are the values used for the bezier curve
@@ -107,7 +157,7 @@ private:
     float _zoom_bounce_p1;
     float _zoom_bounce_p2;
     float _zoom_bounce_t;
-    float _zoom_bounce_duration = 0.2;
+    float _zoom_bounce_duration;
 
     // if you zoom in/out while the scale is bouncing back,
     // the bezier curve will need to be recalculated
@@ -119,8 +169,8 @@ private:
     // _column[chunk_index][y] = {r, g, b, a}
     // when drawing a row or column, the chunks are iterated over, instead of individual rows.
     // then, each cell of the chunk is iterated over. this allows for empty pixels to be ignored.
-    unordered_map<int, unordered_map<int, unordered_map<int, sf::Uint8[4]>>> _columns;
-    unordered_map<int, unordered_map<int, unordered_map<int, sf::Uint8[4]>>> _rows;
+    std::unordered_map<int, std::unordered_map<int, std::unordered_map<int, sf::Uint8[4]>>> _columns;
+    std::unordered_map<int, std::unordered_map<int, std::unordered_map<int, sf::Uint8[4]>>> _rows;
 
     // a pixel buffer for drawing rows/columns. these pixels are used to update the grid texture
     // the grid texture is located in graphics memory, so the pixels should not be edited directly,
@@ -152,20 +202,21 @@ private:
     // sf::Color _gridline_color{0x22, 0x22, 0x22};
 
     // ubuntu
-    sf::Color _background_color{0x1b, 0x1b, 0x1b};
-    sf::Color _gridline_color{0x44, 0x44, 0x44};
+    sf::Color _background_color;
+    sf::Color _gridline_color;
+    sf::Color _aa_color_l;
+    sf::Color _aa_color_r;
 
+    float _start_offset;
+    float _end_offset;
 
-    sf::Color _aa_color_l = _gridline_color;
-    sf::Color _aa_color_r = _gridline_color;
-    float _start_offset, _end_offset;
+    bool _display_grid;
+    float _grid_thickness;
+    bool _gridline_shrink;
 
-    bool _display_grid = true;
-    float _grid_thickness = 0;
-    bool _gridline_shrink = true;
     float _cell_gridline_ratio;
-    int _grid_default_max_alpha = 255;
-    int _grid_max_alpha = _grid_default_max_alpha;
+    int _grid_default_max_alpha;
+    int _grid_max_alpha;
     int _fade_end_scale;
     int _fade_start_scale;
 
@@ -176,10 +227,10 @@ private:
     // timer that keeps track of the user's timer.
     // each time this timer ticks, onTimer() is called
     sf::Clock _clock, _timer;
-    float _timer_interval = 1;
+    float _timer_interval;
 
     sf::Clock _mouse_timer;
-    float _t_per_mouse_pos = 0.01;
+    float _t_per_mouse_pos;
     static const int _n_mouse_positions = 4;
     int _mouse_x_positions [_n_mouse_positions];
     int _mouse_y_positions [_n_mouse_positions];
@@ -189,9 +240,6 @@ private:
     sf::Texture _grid_texture;
 
     sf::VertexArray _vertex_array;
-    sf::VertexArray _line_array;
-
-    sf::RenderTexture _column_rendertex;
 
     // sprites simply wrap textures and are used for rendering instead
     // of using the textures themselves.
@@ -250,9 +298,14 @@ private:
     void onMousePress(int button);
     void onMouseRelease(int button);
     void onMouseScroll(int wheel, float delta);
+    void calculateTraversedCells(int target_x, int target_y);
+    void onMouseDrag(int cell_x, int cell_y);
     void recordMousePos();
     void onPanButtonPress();
     void onPanButtonRelease();
+
+    // animations.cpp
+    void animateCells(float delta_time);
 };
 
 #endif
