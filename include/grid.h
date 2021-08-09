@@ -77,6 +77,8 @@ private:
 
     sf::Shader _shader;
 
+    int _max_chunk;
+
     int _grid_texture_width;
     int _grid_texture_height;
     int _max_cells_x;
@@ -110,8 +112,8 @@ private:
     // screen's top left corner coordinates of grid
     int _cam_x = 0;
     int _cam_y = 0;
-    float _cam_x_decimal = 0.5;
-    float _cam_y_decimal = 0.5;
+    float _cam_x_decimal = 0;
+    float _cam_y_decimal = 0;
     float _blit_x_offset;
     float _blit_y_offset;
 
@@ -131,10 +133,7 @@ private:
 
     float _min_pan_vel;
 
-    // introduced cells should be drawn altogether once per frame.
-    // this way, the grid can zoom, pan, and resize multiple times without
-    // redrawing introduced cells multiple times
-    bool _screen_changed = false;
+    bool _grid_moved;
 
     // how zoomed in grid is. eg. scale 1.5 means each cell is 1.5 pixels.
     // min and max scale determine cell size limits. cell size < 1 is possible but
@@ -178,33 +177,10 @@ private:
     // since calls are slow.
     // sf::Uint8 * _pixels;
 
-    // solarized
-    // sf::Color _background_color{0x00, 0x2b, 0x36};
-    // sf::Color _gridline_color{0x1c, 0x41, 0x4a};
-
-    // gruvbox light
-    // sf::Color _background_color{0xFB, 0xF1, 0xC7};
-    // sf::Color _gridline_color{0xC6, 0xBA, 0x9D};
-
-    // gruvbox dark
-    // sf::Color _background_color{0x28, 0x28, 0x28};
-    // sf::Color _gridline_color{0x45, 0x41, 0x3D};
-
-    // one dark
-    // sf::Color _background_color{0x28, 0x2C, 0x34};
-    // sf::Color _gridline_color{0x38, 0x3C, 0x46};
-
-    // boring light
-    // sf::Color _background_color{0xff, 0xff, 0xff};
-    // sf::Color _gridline_color{0x66, 0x66, 0x66};
-
-    // boring dark
-    // sf::Color _background_color{0x00, 0x00, 0x00};
-    // sf::Color _gridline_color{0x22, 0x22, 0x22};
-
-    // ubuntu
     sf::Color _background_color;
+    sf::Color _foreground_color;
     sf::Color _gridline_color;
+
     sf::Color _aa_color_l;
     sf::Color _aa_color_r;
 
