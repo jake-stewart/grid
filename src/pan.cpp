@@ -12,7 +12,7 @@ void Grid::pan(float x, float y) {
     _cam_y += cell_pan;
     _cam_y_decimal -= cell_pan;
 
-    _screen_changed = true;
+    _grid_moved = true;
 }
 
 void Grid::applyPanVel(float delta_time) {
@@ -29,5 +29,6 @@ void Grid::applyPanVel(float delta_time) {
         _pan_vel_x = 0;
         _pan_vel_y = 0;
     }
+    onMouseMotion(_mouse_x, _mouse_y);
 }
 

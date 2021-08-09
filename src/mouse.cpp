@@ -15,8 +15,8 @@ void Grid::onMouseMotion(int x, int y) {
         pan((_mouse_x - x) / _scale,
             (_mouse_y - y) / _scale);
 
-    int mouse_cell_x = _cam_x + floor((_mouse_x / _scale) + _cam_x_decimal);
-    int mouse_cell_y = _cam_y + floor((_mouse_y / _scale) + _cam_y_decimal);
+    int mouse_cell_x = _cam_x + (int)floor((_mouse_x / _scale) + _cam_x_decimal);
+    int mouse_cell_y = _cam_y + (int)floor((_mouse_y / _scale) + _cam_y_decimal);
 
     calculateTraversedCells(mouse_cell_x, mouse_cell_y);
 
@@ -39,13 +39,13 @@ void Grid::calculateTraversedCells(int target_x, int target_y) {
     else if (_mouse_cell_y == target_y)
         y_vel = 0;
 
-    float x = _mouse_cell_x;
-    float last_x = _mouse_cell_x;
-    float cell_x = _mouse_cell_x;
+    float x = 0;
+    int last_x = _mouse_cell_x;
+    int cell_x = _mouse_cell_x;
 
-    float y = _mouse_cell_y;
-    float last_y = _mouse_cell_y;
-    float cell_y = _mouse_cell_y;
+    float y = 0;
+    int last_y = _mouse_cell_y;
+    int cell_y = _mouse_cell_y;
 
 
     while (true) {
@@ -63,8 +63,8 @@ void Grid::calculateTraversedCells(int target_x, int target_y) {
         }
 
         // you can use int() instead of round(), but round() is smoother
-        cell_x = round(x);
-        cell_y = round(y);
+        cell_x = _mouse_cell_x + (int)round(x);
+        cell_y = _mouse_cell_y + (int)round(y);
 
         // avoid multiple mouse events over the same cell
         if (cell_x == last_x && cell_y == last_y)
@@ -93,14 +93,13 @@ void Grid::calculateTraversedCells(int target_x, int target_y) {
 
 void Grid::onMouseDrag(int cell_x, int cell_y) {
     if (_left_mouse_pressed)
-        drawCell(cell_x, cell_y, 255, 255, 255, 0.25);
+        drawCell(cell_x, cell_y, _foreground_color, 0.25);
 
     else if (_right_mouse_pressed)
         drawCell(
             cell_x, cell_y,
-            _background_color.r, _background_color.g, _background_color.b, 0.25
+            _background_color, 0.25
         );
-
 }
 
 void Grid::onMousePress(int button) {
@@ -108,16 +107,17 @@ void Grid::onMousePress(int button) {
         onPanButtonPress();
     }
     else if (button == sf::Mouse::Left) {
-        int x = _cam_x + floor((_mouse_x / _scale) + _cam_x_decimal);
-        int y = _cam_y + floor((_mouse_y / _scale) + _cam_y_decimal);
+        int x = _cam_x + (int)floor((_mouse_x / _scale) + _cam_x_decimal);
+        int y = _cam_y + (int)floor((_mouse_y / _scale) + _cam_y_decimal);
         _left_mouse_pressed = true;
-        drawCell(x, y, 255, 255, 255, 0.25);
+
+        drawCell(x, y, _foreground_color, 0.25);
     }
     else if (button == sf::Mouse::Right) {
-        int x = _cam_x + floor((_mouse_x / _scale) + _cam_x_decimal);
-        int y = _cam_y + floor((_mouse_y / _scale) + _cam_y_decimal);
+        int x = _cam_x + (int)floor((_mouse_x / _scale) + _cam_x_decimal);
+        int y = _cam_y + (int)floor((_mouse_y / _scale) + _cam_y_decimal);
         _right_mouse_pressed = true;
-        drawCell(x, y, _background_color.r, _background_color.g, _background_color.b, 0.25);
+        drawCell(x, y, _background_color, 0.25);
     }
 }
 

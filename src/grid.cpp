@@ -1,6 +1,7 @@
 #include <SFML/Graphics.hpp>
 #include <math.h>
 #include <iostream>
+#include <climits>
 #include "grid.h"
 
 #define RAND() static_cast <float> (rand()) / static_cast <float> (RAND_MAX)
@@ -30,13 +31,28 @@
 // [ ] extendability
 
 Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
+    _cam_x = 2147483648;
+    _cam_y = 2147483648;
+    // _cam_x = 0;
+    // _cam_y = 0;
+
     _title = title;
     _screen_width = scale * n_cols;
     _screen_height = scale * n_rows;
 
+    _mouse_cell_x = _cam_x;
+    _mouse_cell_y = _cam_y;
+
+    _col_start = _cam_x;
+    _row_start = _cam_y;
+    _col_end = _cam_x;
+    _row_end = _cam_y;
+
     _stress_test = false;
 
     _chunk_size = 32;
+    _max_chunk = ((unsigned int)INT_MAX + 1) / _chunk_size;
+
     _grid_fading = 0;
     _grid_fade_duration = 0.15;
 
@@ -67,8 +83,41 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
 
     _zoom_bounce_duration = 0.2;
 
-    _background_color = sf::Color{0x1b, 0x1b, 0x1b};
-    _gridline_color = sf::Color{0x44, 0x44, 0x44};
+    // solarized
+    _foreground_color = sf::Color{0xEE, 0xE8, 0xD5};
+    _background_color = sf::Color{0x00, 0x2b, 0x36};
+    _gridline_color   = sf::Color{0x1c, 0x41, 0x4a};
+
+    // gruvbox light
+    // _foreground_color = sf::Color{0x3C, 0x38, 0x36};
+    // _background_color = sf::Color{0xFB, 0xF1, 0xC7};
+    // _gridline_color   = sf::Color{0xC6, 0xBA, 0x9D};
+
+    // gruvbox dark
+    // _foreground_color = sf::Color{0xEB, 0xDB, 0xB2};
+    // _background_color = sf::Color{0x28, 0x28, 0x28};
+    // _gridline_color   = sf::Color{0x45, 0x41, 0x3D};
+
+    // one dark
+    // _foreground_color = sf::Color{0xAB, 0xB2, 0xBF};
+    // _background_color = sf::Color{0x28, 0x2C, 0x34};
+    // _gridline_color   = sf::Color{0x38, 0x3C, 0x46};
+
+    // boring light
+    // _foreground_color = sf::Color{0x00, 0x00, 0x00};
+    // _background_color = sf::Color{0xff, 0xff, 0xff};
+    // _gridline_color   = sf::Color{0x44, 0x44, 0x44};
+
+    // boring dark
+    // _foreground_color = sf::Color{0xff, 0xff, 0xff};
+    // _background_color = sf::Color{0x00, 0x00, 0x00};
+    // _gridline_color   = sf::Color{0x22, 0x22, 0x22};
+
+    // ubuntu
+    // _foreground_color = sf::Color{0xaa, 0xaa, 0xaa};
+    // _background_color = sf::Color{0x1b, 0x1b, 0x1b};
+    // _gridline_color   = sf::Color{0x44, 0x44, 0x44};
+
     _aa_color_l = _gridline_color;
     _aa_color_r = _gridline_color;
 
@@ -146,7 +195,6 @@ void Grid::mainloop() {
 
     while (_window.isOpen())
     {
-        // pan(0.01 / _scale, 0.01 / _scale);
         delta_time = _clock.restart().asSeconds();
         incrementTimer();
         handleEvents();
@@ -161,29 +209,27 @@ void Grid::mainloop() {
                 .asSeconds() > _t_per_mouse_pos)
             recordMousePos();
 
-
-        if (_vertex_array.getVertexCount()) {
-            _screen_changed = true;
+        if (_grid_moved) {
+            _grid_moved = false;
+            drawIntroducedCells();
         }
 
-        if (_screen_changed) {
-            _screen_changed = false;
-            drawIntroducedCells();
-            _window.clear();
+        if (_animated_cells.size())
             animateCells(delta_time);
 
+        if (_vertex_array.getVertexCount()) {
             _vertex_array.setPrimitiveType(sf::Points);
             _grid_texture.draw(_vertex_array);
             _vertex_array.clear();
+        }
 
-            render();
+        render();
 
-            if (_display_grid && _grid_thickness > 0) {
-                if (_antialias_enabled)
-                    renderGridlinesAA();
-                else
-                    renderGridlines();
-            }
+        if (_display_grid && _grid_thickness > 0) {
+            if (_antialias_enabled)
+                renderGridlinesAA();
+            else
+                renderGridlines();
         }
 
         _window.display();

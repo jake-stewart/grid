@@ -96,19 +96,15 @@ void Grid::onKeyPress(int key_code) {
     switch (key_code)
     {
         case sf::Keyboard::Up:
-            pan(0, -0.001);
             break;
 
         case sf::Keyboard::Down:
-            pan(0, 0.001);
             break;
 
         case sf::Keyboard::Left:
-            pan(-0.001, 0);
             break;
 
         case sf::Keyboard::Right:
-            pan(0.001, 0);
             break;
         
         case sf::Keyboard::F:

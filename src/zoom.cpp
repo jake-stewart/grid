@@ -12,8 +12,6 @@ void Grid::zoom(float factor, int x, int y) {
 
     pan(x_pos - x / _scale,
         y_pos - y / _scale);
-
-    _screen_changed = true;
 }
 
 void Grid::applyZoomVel(float delta_time) {

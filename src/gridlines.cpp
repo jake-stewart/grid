@@ -146,7 +146,6 @@ void Grid::calcGridlineAA(float p) {
 }
 
 void Grid::applyGridFading(float delta_time) {
-    _screen_changed = true;
     _display_grid = true;
     _grid_max_alpha += _grid_fading * (delta_time / _grid_fade_duration) * 255;
 

@@ -40,13 +40,10 @@ void Grid::setGridlinesFade(float start_scale, float end_scale) {
         _fade_start_scale = start_scale;
         _fade_end_scale = end_scale;
     }
-
-    _screen_changed = true;
 }
 
 void Grid::setGridlineAlpha(int alpha) {
     _grid_default_max_alpha = alpha;
-    _screen_changed = true;
 }
 
 void Grid::toggleGridlines() {
@@ -63,12 +60,9 @@ void Grid::toggleGridlines() {
 void Grid::useAntialiasing(bool value) {
     _antialias_enabled = value;
     _grid_texture.setSmooth(_antialias_enabled);
-    _screen_changed = true;
 }
 
 void Grid::setGridThickness(float value) {
-    _screen_changed = true;
-
     // value <= 0 will disable gridlines entirely
     if (value <= 0) {
         _grid_thickness = 0;
@@ -128,13 +122,32 @@ void Grid::drawCell(int x, int y, sf::Color color) {
     _columns[x][y / _chunk_size][y] = color;
     _rows[y][x / _chunk_size][x] = color;
 
-    if (_col_start <= x && x <= _col_end && _row_start <= y && y <= _row_end) {
-        float blit_x = x % _grid_texture_width + 0.5;
-        if (blit_x < 0) blit_x += _grid_texture_width;
-
-        float blit_y = y % _grid_texture_height + 0.5;
-        if (blit_y < 0) blit_y += _grid_texture_height;
-
-        ADD_VERTEX(blit_x, blit_y, color);
+    if (_col_start > _col_end) {
+        int a = x + _n_visible_cols * 2;
+        int b = _cam_x + _n_visible_cols * 2;
+        int c = b + _n_visible_cols;
+        if (a < b || a >= c)
+            return;
     }
+    else if (x < _cam_x || x >= _cam_x + _n_visible_cols)
+        return;
+
+    if (_row_start > _row_end) {
+        int a = y + _n_visible_rows * 2;
+        int b = _cam_y + _n_visible_rows * 2;
+        int c = b + _n_visible_rows;
+        if (a < b || a >= c) {
+            return;
+        }
+    }
+    else if (y < _cam_y || y >= _cam_y + _n_visible_rows)
+        return;
+
+    float blit_x = (x % _grid_texture_width) + 0.5;
+    if (blit_x < 0) blit_x += _grid_texture_width;
+
+    float blit_y = (y % _grid_texture_height) + 0.5;
+    if (blit_y < 0) blit_y += _grid_texture_height;
+
+    ADD_VERTEX(blit_x, blit_y, color);
 }

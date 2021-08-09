@@ -46,9 +46,6 @@ void Grid::animateCells(float delta_time) {
         );
         it++;
     }
-
-    if (_animated_cells.size())
-        _screen_changed = true;
 }
 
 void Grid::drawCell(int x, int y, sf::Uint8 r, sf::Uint8 g, sf::Uint8 b, float anim_duration) {
@@ -56,9 +53,6 @@ void Grid::drawCell(int x, int y, sf::Uint8 r, sf::Uint8 g, sf::Uint8 b, float a
 }
 
 void Grid::drawCell(int x, int y, sf::Color end_color, float anim_duration) {
-
-    _screen_changed = true;
-
     sf::Color start_color = getCell(x, y);
 
     auto it = _animated_cells.find(Coord(x, y));
