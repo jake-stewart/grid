@@ -7,7 +7,7 @@ IF (WIN32)
     # Include local sfml cmake config
     set(SFML_DIR "${CMAKE_CURRENT_SOURCE_DIR}/SFML-2.5.1/lib/cmake/SFML")
     # Link sfml statically
-    set(SFML_STATIC_LIBRARIES FALSE)
+    set(SFML_STATIC_LIBRARIES TRUE)
 ENDIF()
 
 # Find SFML shared libraries
