@@ -52,12 +52,12 @@ void Grid::handleEvents() {
 void Grid::onStart() {
     for (int y = 5; y < 100; y += 5) {
         for (int x = 0; x < 100; x += 1) {
-            drawCell(x, y, 100, 100, 100);
+            drawCell(x, y, _foreground_color);
         }
     }
     for (int x = 5; x < 100; x += 5) {
         for (int y = 0; y < 100; y += 1) {
-            drawCell(x, y, 100, 100, 100);
+            drawCell(x, y, _foreground_color);
         }
     }
 }
@@ -96,15 +96,19 @@ void Grid::onKeyPress(int key_code) {
     switch (key_code)
     {
         case sf::Keyboard::Up:
+			pan(0, 0.01);
             break;
 
         case sf::Keyboard::Down:
+			pan(0, -0.01);
             break;
 
         case sf::Keyboard::Left:
+			pan(-0.01, 0);
             break;
 
         case sf::Keyboard::Right:
+			pan(0.01, 0);
             break;
         
         case sf::Keyboard::F:
@@ -125,7 +129,7 @@ void Grid::onWindowClose() {
 }
 
 void Grid::onTimer() {
-    if (_stress_test)
+    // if (_stress_test)
         std::cout << "FPS: " << _n_frames << std::endl;
     _n_frames = 0;
 }

@@ -31,10 +31,10 @@
 // [ ] extendability
 
 Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
-    _cam_x = 2147483648;
-    _cam_y = 2147483648;
-    // _cam_x = 0;
-    // _cam_y = 0;
+    // _cam_x = 2147483648;
+    // _cam_y = 2147483648;
+    _cam_x = 0;
+    _cam_y = 0;
 
     _title = title;
     _screen_width = scale * n_cols;
@@ -66,7 +66,7 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
 
     _t_per_mouse_pos = 0.01;
 
-    _max_fps = 150;
+    _max_fps = 70;
 
     _pan_button = sf::Mouse::Middle;
     _min_pan_vel = 1;
@@ -84,39 +84,53 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
     _zoom_bounce_duration = 0.2;
 
     // solarized
-    _foreground_color = sf::Color{0xEE, 0xE8, 0xD5};
-    _background_color = sf::Color{0x00, 0x2b, 0x36};
-    _gridline_color   = sf::Color{0x1c, 0x41, 0x4a};
+    // _foreground_color = sf::Color{0xEE, 0xE8, 0xD5};
+    // _background_color = sf::Color{0x00, 0x2b, 0x36};
+    // _gridline_color   = sf::Color{0x1c, 0x41, 0x4a};
+    // setGridThickness(0.08);
+    // setGridlinesFade(7, 20);
 
     // gruvbox light
     // _foreground_color = sf::Color{0x3C, 0x38, 0x36};
     // _background_color = sf::Color{0xFB, 0xF1, 0xC7};
     // _gridline_color   = sf::Color{0xC6, 0xBA, 0x9D};
+    // setGridThickness(0.08);
+    // setGridlinesFade(7, 20);
 
     // gruvbox dark
     // _foreground_color = sf::Color{0xEB, 0xDB, 0xB2};
     // _background_color = sf::Color{0x28, 0x28, 0x28};
     // _gridline_color   = sf::Color{0x45, 0x41, 0x3D};
+    // setGridThickness(0.08);
+    // setGridlinesFade(7, 20);
 
     // one dark
     // _foreground_color = sf::Color{0xAB, 0xB2, 0xBF};
     // _background_color = sf::Color{0x28, 0x2C, 0x34};
     // _gridline_color   = sf::Color{0x38, 0x3C, 0x46};
+    // setGridThickness(0.08);
+    // setGridlinesFade(7, 20);
 
     // boring light
-    // _foreground_color = sf::Color{0x00, 0x00, 0x00};
+    // _foreground_color = sf::Color{0x7e, 0x7a, 0x7a};
     // _background_color = sf::Color{0xff, 0xff, 0xff};
-    // _gridline_color   = sf::Color{0x44, 0x44, 0x44};
+    // _gridline_color   = sf::Color{0x55, 0x55, 0x55};
+    // setGridThickness(0.03);
+    // setGridlinesFade(10, 30);
 
     // boring dark
     // _foreground_color = sf::Color{0xff, 0xff, 0xff};
     // _background_color = sf::Color{0x00, 0x00, 0x00};
     // _gridline_color   = sf::Color{0x22, 0x22, 0x22};
+    // setGridThickness(0.08);
+    // setGridlinesFade(7, 20);
 
     // ubuntu
-    // _foreground_color = sf::Color{0xaa, 0xaa, 0xaa};
-    // _background_color = sf::Color{0x1b, 0x1b, 0x1b};
-    // _gridline_color   = sf::Color{0x44, 0x44, 0x44};
+    _foreground_color = sf::Color{0xaa, 0xaa, 0xaa};
+    _background_color = sf::Color{0x1b, 0x1b, 0x1b};
+    _gridline_color   = sf::Color{0x44, 0x44, 0x44};
+    setGridThickness(0.08);
+    setGridlinesFade(7, 20);
 
     _aa_color_l = _gridline_color;
     _aa_color_r = _gridline_color;
@@ -181,9 +195,6 @@ int Grid::initialize() {
     _grid_texture.setSmooth(_antialias_enabled);
 
     setScale(_scale);
-    setGridThickness(0.08);
-    setGridlinesFade(7, 20);
-
     return 0;
 }
 
