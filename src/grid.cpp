@@ -66,7 +66,7 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
 
     _t_per_mouse_pos = 0.01;
 
-    _max_fps = 70;
+    _max_fps = 69;
 
     _pan_button = sf::Mouse::Middle;
     _min_pan_vel = 1;
