@@ -5,6 +5,14 @@
 #include <unordered_map>
 #include <vector>
 #include <math.h>
+#include <thread>
+
+struct QueuedCell
+{
+    int x;
+    int y;
+    sf::Color color;
+};
 
 struct Coord
 {
@@ -50,6 +58,13 @@ public:
     int start();
     void drawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g);
     void drawCell(int x, int y, sf::Color color);
+
+    void threadDrawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g);
+    void threadDrawCell(int x, int y, sf::Color color);
+    void drawCellQueue();
+    int _current_queue_idx = 0;
+    std::vector<QueuedCell> _cell_draw_queue;
+
     sf::Color getCell(int x, int y);
     void setScale(float scale);
     void setGridThickness(float value);
@@ -63,11 +78,14 @@ public:
     void drawCell(int x, int y, sf::Color, float anim_duration);
 
 private:
-    bool _stress_test;
-
     int _chunk_size;
     int _grid_fading;
     float _grid_fade_duration;
+
+    std::thread _thread;
+    bool _thread_running = false;
+    bool _start_thread = false;
+    bool _thread_finished = true;
 
     bool _antialias_enabled;
 
@@ -88,9 +106,6 @@ private:
     int _pan_button = -1;
     bool _pan_button_pressed = false;
 
-    bool _left_mouse_pressed = false;
-    bool _right_mouse_pressed = false;
-
     // TODO: rename
     int _fill_x;
     int _mouse_cell_x = 0;
@@ -107,7 +122,6 @@ private:
     int _screen_height;
 
     int _max_fps;
-    int _n_frames = 0;
 
     // screen's top left corner coordinates of grid
     int _cam_x = 0;
@@ -205,6 +219,7 @@ private:
     // each time this timer ticks, onTimer() is called
     sf::Clock _clock, _timer;
     float _timer_interval;
+    bool _timer_active = false;
 
     sf::Clock _mouse_timer;
     float _t_per_mouse_pos;
@@ -250,10 +265,7 @@ private:
 
     // events.cpp
     void handleEvents();
-    void onStart();
     void onResize(unsigned int new_width, unsigned int new_height);
-    void onKeyRelease(int key_code);
-    void onTimer();
     void onKeyPress(int key_code);
     void onWindowClose();
 
@@ -264,7 +276,13 @@ private:
     void applyZoomBounce(float delta_time);
 
     // timer.cpp
+    void startTimer();
+    void setTimer(float timer_interval);
+    void stopTimer();
     void incrementTimer();
+    void endThread();
+    void startThread();
+    void threadFunc();
 
     // pan.cpp
     void pan(float x, float y);
@@ -276,13 +294,22 @@ private:
     void onMouseRelease(int button);
     void onMouseScroll(int wheel, float delta);
     void calculateTraversedCells(int target_x, int target_y);
-    void onMouseDrag(int cell_x, int cell_y);
     void recordMousePos();
     void onPanButtonPress();
     void onPanButtonRelease();
 
     // animations.cpp
     void animateCells(float delta_time);
+    void finishAnimations();
+
+    // main.cpp
+    void onMouseDragEvent(int cell_x, int cell_y);
+    void onMousePressEvent(int x, int y, int button);
+    void onMouseReleaseEvent(int x, int y, int button);
+    void onKeyPressEvent(int key_code);
+    void onKeyReleaseEvent(int key_code);
+    void onStartEvent();
+    void onTimerEvent();
 };
 
 #endif
