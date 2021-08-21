@@ -15,6 +15,17 @@ sf::Color colorMix(sf::Color a, sf::Color b, float perc) {
     };
 }
 
+void Grid::finishAnimations() {
+    for (auto it: _animated_cells) {
+        drawCell(
+            it.first.x,
+            it.first.y,
+            it.second.end_color
+        );
+    }
+    _animated_cells.clear();
+}
+
 void Grid::animateCells(float delta_time) {
     float progress;
 

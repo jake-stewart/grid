@@ -70,7 +70,7 @@ void Grid::calculateTraversedCells(int target_x, int target_y) {
         if (cell_x == last_x && cell_y == last_y)
             continue;
 
-        onMouseDrag(cell_x, cell_y);
+        onMouseDragEvent(cell_x, cell_y);
 
         // if the cell jumped diagonally, we want to fill it in
         // whether we fill the cell on the x axis or y axis is important
@@ -79,9 +79,9 @@ void Grid::calculateTraversedCells(int target_x, int target_y) {
 
         if (last_x != cell_x && last_y != cell_y) {
             if (_fill_x)
-                onMouseDrag(last_x, cell_y);
+                onMouseDragEvent(last_x, cell_y);
             else
-                onMouseDrag(cell_x, last_y);
+                onMouseDragEvent(cell_x, last_y);
         }
         else
             _fill_x = last_y == cell_y;
@@ -91,33 +91,14 @@ void Grid::calculateTraversedCells(int target_x, int target_y) {
     }
 }
 
-void Grid::onMouseDrag(int cell_x, int cell_y) {
-    if (_left_mouse_pressed)
-        drawCell(cell_x, cell_y, _foreground_color, 0.15);
-
-    else if (_right_mouse_pressed)
-        drawCell(
-            cell_x, cell_y,
-            _background_color, 0.15
-        );
-}
-
 void Grid::onMousePress(int button) {
-    if (button == _pan_button) {
+    if (button == _pan_button)
         onPanButtonPress();
-    }
-    else if (button == sf::Mouse::Left) {
-        int x = _cam_x + (int)floor((_mouse_x / _scale) + _cam_x_decimal);
-        int y = _cam_y + (int)floor((_mouse_y / _scale) + _cam_y_decimal);
-        _left_mouse_pressed = true;
 
-        drawCell(x, y, _foreground_color, 0.15);
-    }
-    else if (button == sf::Mouse::Right) {
+    else {
         int x = _cam_x + (int)floor((_mouse_x / _scale) + _cam_x_decimal);
         int y = _cam_y + (int)floor((_mouse_y / _scale) + _cam_y_decimal);
-        _right_mouse_pressed = true;
-        drawCell(x, y, _background_color, 0.15);
+        onMousePressEvent(x, y, button);
     }
 }
 
@@ -151,12 +132,12 @@ void Grid::onPanButtonRelease() {
 void Grid::onMouseRelease(int button) {
     if (button == _pan_button)
         onPanButtonRelease();
+    else {
+        int x = _cam_x + (int)floor((_mouse_x / _scale) + _cam_x_decimal);
+        int y = _cam_y + (int)floor((_mouse_y / _scale) + _cam_y_decimal);
+        onMouseReleaseEvent(x, y, button);
+    }
 
-    else if (button == sf::Mouse::Left)
-        _left_mouse_pressed = false;
-
-    else if (button == sf::Mouse::Right)
-        _right_mouse_pressed = false;
 }
 
 void Grid::onMouseScroll(int wheel, float delta) {

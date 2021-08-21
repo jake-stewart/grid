@@ -24,6 +24,8 @@ void Grid::render() {
     _blit_x_offset = (-1 + (1 - _cam_x_decimal)) * _scale;
     _blit_y_offset = (-1 + (1 - _cam_y_decimal)) * _scale;
 
+    sf::Rect<int> rect = _grid_sprite.getTextureRect();
+
     _grid_sprite.setPosition(_blit_x_offset, _blit_y_offset);
 
     if (_antialias_enabled) {

@@ -31,8 +31,8 @@
 // [ ] extendability
 
 Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
-    // _cam_x = 2147483648;
-    // _cam_y = 2147483648;
+    //_cam_x = 2147483648;
+    //_cam_y = 2147483648;
     _cam_x = 0;
     _cam_y = 0;
 
@@ -47,8 +47,6 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
     _row_start = _cam_y;
     _col_end = _cam_x;
     _row_end = _cam_y;
-
-    _stress_test = false;
 
     _chunk_size = 32;
     _max_chunk = ((unsigned int)INT_MAX + 1) / _chunk_size;
@@ -66,7 +64,7 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
 
     _t_per_mouse_pos = 0.01;
 
-    _max_fps = 70;
+    _max_fps = 150;
 
     _pan_button = sf::Mouse::Middle;
     _min_pan_vel = 1;
@@ -84,53 +82,39 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
     _zoom_bounce_duration = 0.2;
 
     // solarized
-    // _foreground_color = sf::Color{0xEE, 0xE8, 0xD5};
-    // _background_color = sf::Color{0x00, 0x2b, 0x36};
-    // _gridline_color   = sf::Color{0x1c, 0x41, 0x4a};
-    // setGridThickness(0.08);
-    // setGridlinesFade(7, 20);
+    //_foreground_color = sf::Color{0xEE, 0xE8, 0xD5};
+    //_background_color = sf::Color{0x00, 0x2b, 0x36};
+    //_gridline_color   = sf::Color{0x1c, 0x41, 0x4a};
 
     // gruvbox light
-    // _foreground_color = sf::Color{0x3C, 0x38, 0x36};
-    // _background_color = sf::Color{0xFB, 0xF1, 0xC7};
-    // _gridline_color   = sf::Color{0xC6, 0xBA, 0x9D};
-    // setGridThickness(0.08);
-    // setGridlinesFade(7, 20);
+    //_foreground_color = sf::Color{0x3C, 0x38, 0x36};
+    //_background_color = sf::Color{0xFB, 0xF1, 0xC7};
+    //_gridline_color   = sf::Color{0xC6, 0xBA, 0x9D};
 
     // gruvbox dark
-    // _foreground_color = sf::Color{0xEB, 0xDB, 0xB2};
-    // _background_color = sf::Color{0x28, 0x28, 0x28};
-    // _gridline_color   = sf::Color{0x45, 0x41, 0x3D};
-    // setGridThickness(0.08);
-    // setGridlinesFade(7, 20);
+    //_foreground_color = sf::Color{0xEB, 0xDB, 0xB2};
+    //_background_color = sf::Color{0x28, 0x28, 0x28};
+    //_gridline_color   = sf::Color{0x45, 0x41, 0x3D};
 
     // one dark
-    // _foreground_color = sf::Color{0xAB, 0xB2, 0xBF};
-    // _background_color = sf::Color{0x28, 0x2C, 0x34};
-    // _gridline_color   = sf::Color{0x38, 0x3C, 0x46};
-    // setGridThickness(0.08);
-    // setGridlinesFade(7, 20);
+    _foreground_color = sf::Color{0xAB, 0xB2, 0xBF};
+    _background_color = sf::Color{0x28, 0x2C, 0x34};
+    _gridline_color   = sf::Color{0x38, 0x3C, 0x46};
 
     // boring light
-    // _foreground_color = sf::Color{0x7e, 0x7a, 0x7a};
+    // _foreground_color = sf::Color{0x00, 0x00, 0x00};
     // _background_color = sf::Color{0xff, 0xff, 0xff};
-    // _gridline_color   = sf::Color{0x55, 0x55, 0x55};
-    // setGridThickness(0.03);
-    // setGridlinesFade(10, 30);
+    // _gridline_color   = sf::Color{0x44, 0x44, 0x44};
 
     // boring dark
     // _foreground_color = sf::Color{0xff, 0xff, 0xff};
     // _background_color = sf::Color{0x00, 0x00, 0x00};
     // _gridline_color   = sf::Color{0x22, 0x22, 0x22};
-    // setGridThickness(0.08);
-    // setGridlinesFade(7, 20);
 
     // ubuntu
-    _foreground_color = sf::Color{0xaa, 0xaa, 0xaa};
-    _background_color = sf::Color{0x1b, 0x1b, 0x1b};
-    _gridline_color   = sf::Color{0x44, 0x44, 0x44};
-    setGridThickness(0.08);
-    setGridlinesFade(7, 20);
+    // _foreground_color = sf::Color{0xaa, 0xaa, 0xaa};
+    // _background_color = sf::Color{0x1b, 0x1b, 0x1b};
+    // _gridline_color   = sf::Color{0x44, 0x44, 0x44};
 
     _aa_color_l = _gridline_color;
     _aa_color_r = _gridline_color;
@@ -141,8 +125,7 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
 
 int Grid::initialize() {
     _window.create(sf::VideoMode(_screen_width, _screen_height), _title);
-    if (!_stress_test)
-        _window.setFramerateLimit(_max_fps);
+    _window.setFramerateLimit(_max_fps);
 
     _view = _window.getDefaultView();
 
@@ -194,7 +177,9 @@ int Grid::initialize() {
 
     _grid_texture.setSmooth(_antialias_enabled);
 
-    setScale(_scale);
+    setGridThickness(0.08);
+    setGridlinesFade(7, 20);
+
     return 0;
 }
 
@@ -227,6 +212,9 @@ void Grid::mainloop() {
 
         if (_animated_cells.size())
             animateCells(delta_time);
+
+        if (_cell_draw_queue.size())
+            drawCellQueue();
 
         if (_vertex_array.getVertexCount()) {
             _vertex_array.setPrimitiveType(sf::Points);

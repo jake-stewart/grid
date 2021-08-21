@@ -92,7 +92,8 @@ int Grid::start() {
     if (err_code != 0)
         return err_code;
 
-    onStart();
+    onStartEvent();
+    startThread();
     mainloop();
     return 0;
 }
@@ -151,3 +152,71 @@ void Grid::drawCell(int x, int y, sf::Color color) {
 
     ADD_VERTEX(blit_x, blit_y, color);
 }
+
+
+void Grid::threadDrawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g) {
+    drawCell(x, y, sf::Color{r, g, b});
+}
+
+void Grid::threadDrawCell(int x, int y, sf::Color color) {
+    _columns[x][y / _chunk_size][y] = color;
+    _rows[y][x / _chunk_size][x] = color;
+
+    if (_col_start > _col_end) {
+        int a = x + _n_visible_cols * 2;
+        int b = _cam_x + _n_visible_cols * 2;
+        int c = b + _n_visible_cols;
+        if (a < b || a >= c)
+            return;
+    }
+    else if (x < _cam_x || x >= _cam_x + _n_visible_cols)
+        return;
+
+    if (_row_start > _row_end) {
+        int a = y + _n_visible_rows * 2;
+        int b = _cam_y + _n_visible_rows * 2;
+        int c = b + _n_visible_rows;
+        if (a < b || a >= c) {
+            return;
+        }
+    }
+    else if (y < _cam_y || y >= _cam_y + _n_visible_rows)
+        return;
+
+    _cell_draw_queue.push_back({x, y, color});
+}
+
+void Grid::drawCellQueue() {
+    int size = _cell_draw_queue.size();
+    for (; _current_queue_idx < size; _current_queue_idx++) {
+        if (_col_start > _col_end) {
+            int a = _cell_draw_queue[_current_queue_idx].x + _n_visible_cols * 2;
+            int b = _cam_x + _n_visible_cols * 2;
+            int c = b + _n_visible_cols;
+            if (a < b || a >= c)
+                continue;
+        }
+        else if (_cell_draw_queue[_current_queue_idx].x < _cam_x || _cell_draw_queue[_current_queue_idx].x >= _cam_x + _n_visible_cols)
+            continue;
+
+        if (_row_start > _row_end) {
+            int a = _cell_draw_queue[_current_queue_idx].y + _n_visible_rows * 2;
+            int b = _cam_y + _n_visible_rows * 2;
+            int c = b + _n_visible_rows;
+            if (a < b || a >= c) {
+                continue;
+            }
+        }
+        else if (_cell_draw_queue[_current_queue_idx].y < _cam_y || _cell_draw_queue[_current_queue_idx].y >= _cam_y + _n_visible_rows)
+            continue;
+
+        float blit_x = (_cell_draw_queue[_current_queue_idx].x % _grid_texture_width) + 0.5;
+        if (blit_x < 0) blit_x += _grid_texture_width;
+
+        float blit_y = (_cell_draw_queue[_current_queue_idx].y % _grid_texture_height) + 0.5;
+        if (blit_y < 0) blit_y += _grid_texture_height;
+
+        ADD_VERTEX(blit_x, blit_y, _cell_draw_queue[_current_queue_idx].color);
+    }
+}
+
