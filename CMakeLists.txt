@@ -15,6 +15,8 @@ find_package(SFML 2.5.1 COMPONENTS graphics REQUIRED)
 
 include_directories(include)
 
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+
 file(GLOB SOURCES "src/*.cpp")
 add_executable(Grid ${SOURCES})
 
