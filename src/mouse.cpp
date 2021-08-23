@@ -1,5 +1,4 @@
 #include <math.h>
-#include <iostream>
 #include "grid.h"
 
 void Grid::recordMousePos() {

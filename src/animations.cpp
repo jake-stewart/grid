@@ -1,7 +1,6 @@
 #include <SFML/Graphics.hpp>
 #include "grid.h"
 #include <unordered_map>
-#include <iostream>
 
 using std::unordered_map;
 

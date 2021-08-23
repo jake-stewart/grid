@@ -1,6 +1,5 @@
 #include "grid.h"
 #include <unordered_set>
-#include <iostream>
 #include <unordered_map>
 #include <vector>
 
@@ -20,8 +19,8 @@ bool right_mouse_pressed = false;
 
 int iterations_per_tick = 1;
 
-float speeds[9]     = {1, 0.5, 0.25, 0.1, 0.05, 0.01, 0.005, 0.0025, 0.001};
-float iterations[9] = {1,   1,    1,   1,    1,    1,     3,      5,     7};
+float speeds[9]     = {1, 0.5, 0.25, 0.1, 0.05, 0.01, 0.005, 0.0025, 0.0};
+float iterations[9] = {1,   1,    1,   1,    1,    1,     1,      1,   1};
 
 
 void Grid::onStartEvent() {

@@ -1,6 +1,5 @@
 #include <SFML/Graphics.hpp>
 #include <math.h>
-#include <iostream>
 #include <climits>
 #include "grid.h"
 
@@ -125,7 +124,7 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
 
 int Grid::initialize() {
     _window.create(sf::VideoMode(_screen_width, _screen_height), _title);
-    _window.setFramerateLimit(_max_fps);
+    //_window.setFramerateLimit(_max_fps);
 
     _view = _window.getDefaultView();
 
@@ -177,8 +176,8 @@ int Grid::initialize() {
 
     _grid_texture.setSmooth(_antialias_enabled);
 
-    setGridThickness(0.08);
     setGridlinesFade(7, 20);
+    setGridThickness(0.08);
 
     return 0;
 }
@@ -186,17 +185,19 @@ int Grid::initialize() {
 void Grid::mainloop() {
     // TODO: clean + comments
 
-    bool increasing = true;
     float delta_time;
+	float sleep_time;
+	float frame_time = 1.0 / _max_fps;
 
     while (_window.isOpen())
     {
         delta_time = _clock.restart().asSeconds();
-        incrementTimer();
         handleEvents();
 
-        if (_grid_fading)
-            applyGridFading(delta_time);
+		if (_grid_fading) {
+			_screen_changed = true;
+			applyGridFading(delta_time);
+		}
 
         applyZoomVel(delta_time);
         applyPanVel(delta_time);
@@ -207,11 +208,14 @@ void Grid::mainloop() {
 
         if (_grid_moved) {
             _grid_moved = false;
+            _screen_changed = true;
             drawIntroducedCells();
         }
 
-        if (_animated_cells.size())
-            animateCells(delta_time);
+		if (_animated_cells.size()) {
+			animateCells(delta_time);
+			_screen_changed = true;
+		}
 
         if (_cell_draw_queue.size())
             drawCellQueue();
@@ -222,15 +226,23 @@ void Grid::mainloop() {
             _vertex_array.clear();
         }
 
-        render();
+		if (_screen_changed) {
+			_screen_changed = false;
+			render();
 
-        if (_display_grid && _grid_thickness > 0) {
-            if (_antialias_enabled)
-                renderGridlinesAA();
-            else
-                renderGridlines();
-        }
+			if (_display_grid && _grid_thickness > 0) {
+				if (_antialias_enabled)
+					renderGridlinesAA();
+				else
+					renderGridlines();
+			}
 
-        _window.display();
+			_window.display();
+		}
+        incrementTimer();
+
+		sleep_time = frame_time - delta_time;
+		if (sleep_time > 0)
+			sf::sleep(sf::seconds(sleep_time));
     }
 }

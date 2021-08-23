@@ -1,5 +1,4 @@
 #include <SFML/Graphics.hpp>
-#include <iostream>
 #include <unordered_map>
 #include <math.h>
 #include "grid.h"
@@ -56,13 +55,8 @@ void Grid::drawIntroducedCells() {
     int n_cols_drawn_left = old_col_start - _col_start;
     int n_rows_drawn_top = old_row_start - _row_start;
 
-    bool draw_entire_screen = (
-        abs(n_cols_drawn_left) > _n_visible_cols ||
-        abs(n_rows_drawn_top) > _n_visible_rows
-    );
-
-
-    if (draw_entire_screen) {
+	// if introduced cells are greater than entire screen, just draw the entire screen
+    if (abs(n_cols_drawn_left) > _n_visible_cols || abs(n_rows_drawn_top) > _n_visible_rows) {
         clearArea(
             _cam_x - 1, _cam_y - 1,
             _n_visible_cols + 2, _n_visible_rows + 2

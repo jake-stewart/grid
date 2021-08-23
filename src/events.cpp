@@ -1,5 +1,4 @@
 #include <SFML/Graphics.hpp>
-#include <iostream>
 #include "grid.h"
 
 void Grid::handleEvents() {

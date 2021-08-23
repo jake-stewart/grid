@@ -22,6 +22,7 @@ void Grid::threadFunc() {
         if (_start_thread) {
             _start_thread = false;
             onTimerEvent();
+			_screen_changed = true;
             _thread_finished = true;
         }
     }
@@ -53,7 +54,7 @@ void Grid::incrementTimer() {
     if (!_timer_active)
         return;
 
-    if (_thread_finished && _timer.getElapsedTime().asSeconds() > _timer_interval) {
+    if (_thread_finished && _current_queue_idx == _cell_draw_queue.size() && _timer.getElapsedTime().asSeconds() > _timer_interval) {
         _cell_draw_queue.erase(
             _cell_draw_queue.begin(),
             _cell_draw_queue.begin() + _current_queue_idx
