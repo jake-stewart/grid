@@ -111,6 +111,8 @@ private:
     int _mouse_cell_x = 0;
     int _mouse_cell_y = 0;
 
+	bool _screen_changed = true;
+
     // last mouse location on screen
     int _mouse_x = 0;
     int _mouse_y = 0;
