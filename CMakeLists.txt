@@ -8,18 +8,18 @@ IF (WIN32)
     set(SFML_DIR "${CMAKE_CURRENT_SOURCE_DIR}/SFML-2.5.1/lib/cmake/SFML")
     # Link sfml statically
     set(SFML_STATIC_LIBRARIES TRUE)
+	set(GUI_TYPE "WIN32")
 ENDIF()
 
-# Find SFML shared libraries
-find_package(SFML 2.5.1 COMPONENTS graphics REQUIRED)
-
+# source
 include_directories(include)
+file(GLOB SOURCES "src/*.cpp")
 
+add_executable(Grid ${GUI_TYPE} ${SOURCES})
+
+# threading
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
-file(GLOB SOURCES "src/*.cpp")
-add_executable(Grid ${SOURCES})
-
-find_package(SFML 2.5 
-  COMPONENTS system window graphics REQUIRED)
-target_link_libraries(Grid sfml-graphics)
+# SFML
+find_package(SFML 2.5 COMPONENTS system window graphics main REQUIRED)
+target_link_libraries(Grid sfml-graphics sfml-main)
