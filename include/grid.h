@@ -62,6 +62,8 @@ public:
     void threadDrawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g);
     void threadDrawCell(int x, int y, sf::Color color);
     void drawCellQueue();
+
+    int _queue_max_idx = 0;
     int _current_queue_idx = 0;
     std::vector<QueuedCell> _cell_draw_queue;
 
@@ -78,7 +80,6 @@ public:
     void drawCell(int x, int y, sf::Color, float anim_duration);
 
 private:
-    int _chunk_size;
     int _grid_fading;
     float _grid_fade_duration;
 
@@ -185,8 +186,36 @@ private:
     // _column[chunk_index][y] = {r, g, b, a}
     // when drawing a row or column, the chunks are iterated over, instead of individual rows.
     // then, each cell of the chunk is iterated over. this allows for empty pixels to be ignored.
-    std::unordered_map<int, std::unordered_map<int, std::unordered_map<int, sf::Color>>> _columns;
-    std::unordered_map<int, std::unordered_map<int, std::unordered_map<int, sf::Color>>> _rows;
+
+    //std::unordered_map<int, std::unordered_map<int, std::unordered_map<int, sf::Color>>> _columns;
+    //std::unordered_map<int, std::unordered_map<int, std::unordered_map<int, sf::Color>>> _rows;
+    void updateChunkQueue();
+    void updateChunks();
+    void copyCellDrawQueue();
+    void drawScreen();
+
+    sf::Texture _chunk_texture;
+    sf::Sprite _chunk_sprite;
+    int _n_frames = 0;
+    const static int _chunk_size = 64;
+    int _render_distance;
+    int _chunk_x_cell = 0;
+    int _chunk_y_cell = 0;
+    int _chunk_x = 0;
+    int _chunk_y = 0;
+    std::unordered_map<uint64_t, sf::Uint8[_chunk_size * _chunk_size * 4]> _chunks;
+    std::unordered_map<uint64_t, sf::Uint8[_chunk_size * _chunk_size * 4]> _chunks_buffer;
+    std::unordered_map<uint64_t, sf::Uint8[_chunk_size * _chunk_size * 4]> * _chunks_pointer = &_chunks;
+    std::unordered_map<uint64_t, sf::Uint8[_chunk_size * _chunk_size * 4]> * _thread_chunks_pointer = &_chunks_buffer;
+    std::vector<std::pair<int, int>> _chunk_queue;
+
+    float _frame_duration;
+
+    int _chunk_render_left = 0;
+    int _chunk_render_right = 0;
+    int _chunk_render_top = 0;
+    int _chunk_render_bottom = 0;
+
 
     // a pixel buffer for drawing rows/columns. these pixels are used to update the grid texture
     // the grid texture is located in graphics memory, so the pixels should not be edited directly,
@@ -231,7 +260,7 @@ private:
     int _mouse_pos_idx = 0;
 
     // grid texture stored on graphics card for quicker rendering
-    sf::RenderTexture _grid_texture;
+    sf::RenderTexture _grid_render_texture;
 
     sf::VertexArray _vertex_array;
 
@@ -258,12 +287,6 @@ private:
 
     // grid.cpp
     void render();
-    void clearArea(int x, int y, int n_cols, int n_rows);
-    void calcGridSize();
-    void drawIntroducedCells();
-    void drawRows(int y, int n_rows, int x, int n_cols);
-    void drawColumns(int x, int n_cols);
-    void updateTexture(int blit_x, int blit_y, int n_rows, int n_cols);
 
     // events.cpp
     void handleEvents();
