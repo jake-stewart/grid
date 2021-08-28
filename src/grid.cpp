@@ -2,6 +2,7 @@
 #include <math.h>
 #include <climits>
 #include "grid.h"
+#include <iostream>
 
 #define RAND() static_cast <float> (rand()) / static_cast <float> (RAND_MAX)
 
@@ -47,9 +48,6 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
     _col_end = _cam_x;
     _row_end = _cam_y;
 
-    _chunk_size = 32;
-    _max_chunk = ((unsigned int)INT_MAX + 1) / _chunk_size;
-
     _grid_fading = 0;
     _grid_fade_duration = 0.15;
 
@@ -64,6 +62,7 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
     _t_per_mouse_pos = 0.01;
 
     _max_fps = 150;
+    _frame_duration = 1.0 / _max_fps;
 
     _pan_button = sf::Mouse::Middle;
     _min_pan_vel = 1;
@@ -124,12 +123,15 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
 
 int Grid::initialize() {
     _window.create(sf::VideoMode(_screen_width, _screen_height), _title);
-    //_window.setFramerateLimit(_max_fps);
+    _window.setFramerateLimit(_max_fps);
 
     _view = _window.getDefaultView();
 
     // vertices used for batch drawing multiple grid lines efficiently
     _vertex_array.setPrimitiveType(sf::Quads);
+
+    _chunk_texture.create(_chunk_size, _chunk_size);
+    _chunk_sprite.setTexture(_chunk_texture, true);
 
     // texture stored in graphics memory where each pixel is a cell
     int max_size = sf::Texture::getMaximumSize();
@@ -137,16 +139,25 @@ int Grid::initialize() {
         _grid_texture_width = max_size;
         _grid_texture_height = max_size;
     }
+    if (_grid_texture_width < _grid_texture_height)
+        _render_distance = _grid_texture_width / _chunk_size;
+    else
+        _render_distance = _grid_texture_height / _chunk_size;
+
     _max_cells_x = _grid_texture_width - 2;
     _max_cells_y = _grid_texture_height - 2;
-    _grid_texture.create(_grid_texture_width, _grid_texture_height);
-    _grid_sprite.setTexture(_grid_texture.getTexture());
+    _grid_render_texture.create(_grid_texture_width, _grid_texture_height);
+    _grid_render_texture.clear(_background_color);
+    //_grid_texture = _grid_render_texture.getTexture();
+
+
+    _grid_sprite.setTexture(_grid_render_texture.getTexture());
 
     // when the grid is panned beyond the bounds of the grid texture,
     // the cells are wrapped to the other side of the texture.
     // setting the texture to be repeated allows for the texture to automatically
     // wrap when rendering
-    _grid_texture.setRepeated(true);
+    _grid_render_texture.setRepeated(true);
 
     // pixel which are manipulated before being used to update the grid texture
     // int n_pixels = _grid_texture_width * _grid_texture_height * 4;
@@ -169,12 +180,12 @@ int Grid::initialize() {
 
     if (sf::Shader::isAvailable()) {
         _shader.loadFromMemory(shader_source, sf::Shader::Fragment);
-        _shader.setUniform("tex", _grid_texture.getTexture());
+        _shader.setUniform("tex", _grid_render_texture.getTexture());
         _shader.setUniform("geometry", sf::Vector2f(_grid_texture_width, _grid_texture_height));
         _antialias_enabled = true;
     }
 
-    _grid_texture.setSmooth(_antialias_enabled);
+    _grid_render_texture.setSmooth(_antialias_enabled);
 
     setGridlinesFade(7, 20);
     setGridThickness(0.08);
@@ -186,18 +197,14 @@ void Grid::mainloop() {
     // TODO: clean + comments
 
     float delta_time;
-	float sleep_time;
-	float frame_time = 1.0 / _max_fps;
 
-    while (_window.isOpen())
-    {
+    while (_window.isOpen()) {
         delta_time = _clock.restart().asSeconds();
         handleEvents();
 
-		if (_grid_fading) {
-			_screen_changed = true;
-			applyGridFading(delta_time);
-		}
+        if (_grid_fading) {
+          applyGridFading(delta_time);
+        }
 
         applyZoomVel(delta_time);
         applyPanVel(delta_time);
@@ -207,42 +214,34 @@ void Grid::mainloop() {
             recordMousePos();
 
         if (_grid_moved) {
+            updateChunkQueue();
             _grid_moved = false;
-            _screen_changed = true;
-            drawIntroducedCells();
         }
+        updateChunks();
 
-		if (_animated_cells.size()) {
-			animateCells(delta_time);
-			_screen_changed = true;
-		}
+        if (_animated_cells.size()) 
+          animateCells(delta_time);
 
-        if (_cell_draw_queue.size())
-            drawCellQueue();
+        //if (_cell_draw_queue.size())
+        //    drawCellQueue();
 
         if (_vertex_array.getVertexCount()) {
             _vertex_array.setPrimitiveType(sf::Points);
-            _grid_texture.draw(_vertex_array);
+            _grid_render_texture.draw(_vertex_array);
             _vertex_array.clear();
         }
 
-		if (_screen_changed) {
-			_screen_changed = false;
-			render();
+        //_window.clear(_background_color);
+        render();
 
-			if (_display_grid && _grid_thickness > 0) {
-				if (_antialias_enabled)
-					renderGridlinesAA();
-				else
-					renderGridlines();
-			}
-
-			_window.display();
-		}
+        if (_display_grid && _grid_thickness > 0) {
+          if (_antialias_enabled)
+            renderGridlinesAA();
+          else
+            renderGridlines();
+        }
+        _window.display();
         incrementTimer();
-
-		sleep_time = frame_time - delta_time;
-		if (sleep_time > 0)
-			sf::sleep(sf::seconds(sleep_time));
+        _n_frames++;
     }
 }

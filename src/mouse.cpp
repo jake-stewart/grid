@@ -1,4 +1,5 @@
 #include <math.h>
+#include <iostream>
 #include "grid.h"
 
 void Grid::recordMousePos() {
@@ -14,8 +15,8 @@ void Grid::onMouseMotion(int x, int y) {
         pan((_mouse_x - x) / _scale,
             (_mouse_y - y) / _scale);
 
-    int mouse_cell_x = _cam_x + (int)floor((_mouse_x / _scale) + _cam_x_decimal);
-    int mouse_cell_y = _cam_y + (int)floor((_mouse_y / _scale) + _cam_y_decimal);
+    int mouse_cell_x = _chunk_x_cell + (int)floor(_mouse_x / _scale + _cam_x_decimal);
+    int mouse_cell_y = _chunk_y_cell + (int)floor(_mouse_y / _scale + _cam_y_decimal);
 
     calculateTraversedCells(mouse_cell_x, mouse_cell_y);
 
@@ -94,11 +95,7 @@ void Grid::onMousePress(int button) {
     if (button == _pan_button)
         onPanButtonPress();
 
-    else {
-        int x = _cam_x + (int)floor((_mouse_x / _scale) + _cam_x_decimal);
-        int y = _cam_y + (int)floor((_mouse_y / _scale) + _cam_y_decimal);
-        onMousePressEvent(x, y, button);
-    }
+    else onMousePressEvent(_mouse_cell_x, _mouse_cell_y, button);
 }
 
 void Grid::onPanButtonPress() {
@@ -131,12 +128,8 @@ void Grid::onPanButtonRelease() {
 void Grid::onMouseRelease(int button) {
     if (button == _pan_button)
         onPanButtonRelease();
-    else {
-        int x = _cam_x + (int)floor((_mouse_x / _scale) + _cam_x_decimal);
-        int y = _cam_y + (int)floor((_mouse_y / _scale) + _cam_y_decimal);
-        onMouseReleaseEvent(x, y, button);
-    }
-
+    else
+        onMouseReleaseEvent(_mouse_cell_x, _mouse_cell_y, button);
 }
 
 void Grid::onMouseScroll(int wheel, float delta) {

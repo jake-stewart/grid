@@ -1,4 +1,5 @@
 #include <SFML/Graphics.hpp>
+#include <iostream>
 #include "grid.h"
 
 #define ADD_VERTEX(x, y, color) _vertex_array.append(sf::Vertex({x, y}, color))
@@ -58,7 +59,7 @@ void Grid::toggleGridlines() {
 
 void Grid::useAntialiasing(bool value) {
     _antialias_enabled = value;
-    _grid_texture.setSmooth(_antialias_enabled);
+    _grid_render_texture.setSmooth(_antialias_enabled);
 }
 
 void Grid::setGridThickness(float value) {
@@ -91,6 +92,18 @@ int Grid::start() {
     if (err_code != 0)
         return err_code;
 
+    int n_chunks_width = ceil(_screen_width / (_chunk_size * _scale));
+    int spare_chunks_x = _render_distance - n_chunks_width;
+    if (spare_chunks_x < 0) spare_chunks_x = 0;
+    _chunk_render_left = _chunk_x - spare_chunks_x / 2;
+    _chunk_render_right = _chunk_render_left + _render_distance;
+
+    int n_chunks_height = ceil(_screen_height / (_chunk_size * _scale));
+    int spare_chunks_y = _render_distance - n_chunks_height;
+    if (spare_chunks_y < 0) spare_chunks_y = 0;
+    _chunk_render_top = _chunk_y - spare_chunks_y / 2;
+    _chunk_render_bottom = _chunk_render_top + _render_distance;
+
     onStartEvent();
     startThread();
     mainloop();
@@ -98,20 +111,24 @@ int Grid::start() {
 }
 
 sf::Color Grid::getCell(int x, int y) {
-    auto col_iter = _columns.find(x);
+    int chunk_idx_x = floor(x / (float)_chunk_size);
+    int chunk_idx_y = floor(y / (float)_chunk_size);
 
-    if (col_iter != _columns.end()) {
-        auto chunk_iter = col_iter->second.find(y / _chunk_size);
+    uint64_t chunk_idx = (uint64_t)chunk_idx_x << 32 | (uint32_t)chunk_idx_y;
+    auto chunk = _chunks_pointer->find(chunk_idx);
 
-        if (chunk_iter != col_iter->second.end()) {
-            auto cell_iter = chunk_iter->second.find(y);
+    if (chunk == _chunks_pointer->end())
+        return _background_color;
 
-            if (cell_iter != chunk_iter->second.end())
-                return cell_iter->second;
-        }
-    }
+    int pixel_y = y % _chunk_size;
+    if (pixel_y < 0) pixel_y += _chunk_size;
 
-    return _background_color;
+    int pixel_x = x % _chunk_size;
+    if (pixel_x < 0) pixel_x += _chunk_size;
+
+    int pixel_idx = (pixel_y * _chunk_size + pixel_x) * 4;
+
+    return sf::Color{chunk->second[pixel_idx], chunk->second[pixel_idx + 1], chunk->second[pixel_idx + 2]};
 }
 
 void Grid::drawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g) {
@@ -119,29 +136,56 @@ void Grid::drawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g) {
 }
 
 void Grid::drawCell(int x, int y, sf::Color color) {
-    _columns[x][y / _chunk_size][y] = color;
-    _rows[y][x / _chunk_size][x] = color;
 
-    if (_col_start > _col_end) {
-        int a = x + _n_visible_cols * 2;
-        int b = _cam_x + _n_visible_cols * 2;
-        int c = b + _n_visible_cols;
-        if (a < b || a >= c)
-            return;
-    }
-    else if (x < _cam_x || x >= _cam_x + _n_visible_cols)
-        return;
+    int chunk_idx_x = floor(x / (float)_chunk_size);
+    int chunk_idx_y = floor(y / (float)_chunk_size);
 
-    if (_row_start > _row_end) {
-        int a = y + _n_visible_rows * 2;
-        int b = _cam_y + _n_visible_rows * 2;
-        int c = b + _n_visible_rows;
-        if (a < b || a >= c) {
-            return;
+    uint64_t chunk_idx = (uint64_t)chunk_idx_x << 32 | (uint32_t)chunk_idx_y;
+
+    auto chunk = _chunks_pointer->find(chunk_idx);
+
+    if (chunk == _chunks_pointer->end()) {
+        auto pixels = (*_chunks_pointer)[chunk_idx];
+        auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx];
+        for (int i = 0; i < _chunk_size * _chunk_size * 4; i += 4) {
+            pixels[i] = _background_color.r;
+            pixels[i + 1] = _background_color.g;
+            pixels[i + 2] = _background_color.b;
+            pixels[i + 3] = 255;
+
+            pixels_buffer[i] = _background_color.r;
+            pixels_buffer[i + 1] = _background_color.g;
+            pixels_buffer[i + 2] = _background_color.b;
+            pixels_buffer[i + 3] = 255;
         }
     }
-    else if (y < _cam_y || y >= _cam_y + _n_visible_rows)
+
+    int pixel_y = y % _chunk_size;
+    if (pixel_y < 0) pixel_y += _chunk_size;
+
+    int pixel_x = x % _chunk_size;
+    if (pixel_x < 0) pixel_x += _chunk_size;
+
+    int pixel_idx = (pixel_y * _chunk_size + pixel_x) * 4;
+
+    auto pixels = (*_chunks_pointer)[chunk_idx];
+    auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx];
+
+    pixels[pixel_idx] = color.r;
+    pixels[pixel_idx + 1] = color.g;
+    pixels[pixel_idx + 2] = color.b;
+    pixels[pixel_idx + 3] = 255;
+    pixels_buffer[pixel_idx] = color.r;
+    pixels_buffer[pixel_idx + 1] = color.g;
+    pixels_buffer[pixel_idx + 2] = color.b;
+    pixels_buffer[pixel_idx + 3] = 255;
+
+    if (chunk_idx_x < _chunk_render_left
+            || chunk_idx_x >= _chunk_render_right
+            || chunk_idx_y < _chunk_render_top
+            || chunk_idx_y >= _chunk_render_bottom)
         return;
+
 
     float blit_x = (x % _grid_texture_width) + 0.5;
     if (blit_x < 0) blit_x += _grid_texture_width;
@@ -158,64 +202,92 @@ void Grid::threadDrawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g) {
 }
 
 void Grid::threadDrawCell(int x, int y, sf::Color color) {
-    _columns[x][y / _chunk_size][y] = color;
-    _rows[y][x / _chunk_size][x] = color;
+    _cell_draw_queue.push_back({x, y, color});
 
-    if (_col_start > _col_end) {
-        int a = x + _n_visible_cols * 2;
-        int b = _cam_x + _n_visible_cols * 2;
-        int c = b + _n_visible_cols;
-        if (a < b || a >= c)
-            return;
-    }
-    else if (x < _cam_x || x >= _cam_x + _n_visible_cols)
-        return;
+    int chunk_idx_x = floor(x / (float)_chunk_size);
+    int chunk_idx_y = floor(y / (float)_chunk_size);
 
-    if (_row_start > _row_end) {
-        int a = y + _n_visible_rows * 2;
-        int b = _cam_y + _n_visible_rows * 2;
-        int c = b + _n_visible_rows;
-        if (a < b || a >= c) {
-            return;
+    uint64_t chunk_idx = (uint64_t)chunk_idx_x << 32 | (uint32_t)chunk_idx_y;
+    auto chunk = _thread_chunks_pointer->find(chunk_idx);
+
+    if (chunk == _thread_chunks_pointer->end()) {
+        auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx];
+        for (int i = 0; i < _chunk_size * _chunk_size * 4; i += 4) {
+            pixels_buffer[i] = _background_color.r;
+            pixels_buffer[i + 1] = _background_color.g;
+            pixels_buffer[i + 2] = _background_color.b;
+            pixels_buffer[i + 3] = 255;
         }
     }
-    else if (y < _cam_y || y >= _cam_y + _n_visible_rows)
-        return;
 
-    _cell_draw_queue.push_back({x, y, color});
+    int pixel_y = y % _chunk_size;
+    if (pixel_y < 0) pixel_y += _chunk_size;
+
+    int pixel_x = x % _chunk_size;
+    if (pixel_x < 0) pixel_x += _chunk_size;
+
+    int pixel_idx = (pixel_y * _chunk_size + pixel_x) * 4;
+
+    auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx];
+    pixels_buffer[pixel_idx] = color.r;
+    pixels_buffer[pixel_idx + 1] = color.g;
+    pixels_buffer[pixel_idx + 2] = color.b;
+    pixels_buffer[pixel_idx + 3] = 255;
+}
+
+void Grid::copyCellDrawQueue() {
+    for (auto it: _cell_draw_queue) {
+        int chunk_idx_x = floor(it.x / (float)_chunk_size);
+        int chunk_idx_y = floor(it.y / (float)_chunk_size);
+
+        uint64_t chunk_idx = (uint64_t)chunk_idx_x << 32 | (uint32_t)chunk_idx_y;
+        auto chunk = _thread_chunks_pointer->find(chunk_idx);
+
+        if (chunk == _thread_chunks_pointer->end()) {
+            auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx];
+            for (int i = 0; i < _chunk_size * _chunk_size * 4; i += 4) {
+                pixels_buffer[i] = _background_color.r;
+                pixels_buffer[i + 1] = _background_color.g;
+                pixels_buffer[i + 2] = _background_color.b;
+                pixels_buffer[i + 3] = 255;
+            }
+        }
+
+        int pixel_y = it.y % _chunk_size;
+        if (pixel_y < 0) pixel_y += _chunk_size;
+
+        int pixel_x = it.x % _chunk_size;
+        if (pixel_x < 0) pixel_x += _chunk_size;
+
+        int pixel_idx = (pixel_y * _chunk_size + pixel_x) * 4;
+
+        auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx];
+        pixels_buffer[pixel_idx] = it.color.r;
+        pixels_buffer[pixel_idx + 1] = it.color.g;
+        pixels_buffer[pixel_idx + 2] = it.color.b;
+        pixels_buffer[pixel_idx + 3] = 255;
+    }
+    _cell_draw_queue.clear();
 }
 
 void Grid::drawCellQueue() {
-    int size = _cell_draw_queue.size();
-    for (; _current_queue_idx < size; _current_queue_idx++) {
-        if (_col_start > _col_end) {
-            int a = _cell_draw_queue[_current_queue_idx].x + _n_visible_cols * 2;
-            int b = _cam_x + _n_visible_cols * 2;
-            int c = b + _n_visible_cols;
-            if (a < b || a >= c)
-                continue;
-        }
-        else if (_cell_draw_queue[_current_queue_idx].x < _cam_x || _cell_draw_queue[_current_queue_idx].x >= _cam_x + _n_visible_cols)
-            continue;
+    for (auto it: _cell_draw_queue) {
 
-        if (_row_start > _row_end) {
-            int a = _cell_draw_queue[_current_queue_idx].y + _n_visible_rows * 2;
-            int b = _cam_y + _n_visible_rows * 2;
-            int c = b + _n_visible_rows;
-            if (a < b || a >= c) {
-                continue;
-            }
-        }
-        else if (_cell_draw_queue[_current_queue_idx].y < _cam_y || _cell_draw_queue[_current_queue_idx].y >= _cam_y + _n_visible_rows)
-            continue;
+        int chunk_idx_x = floor(it.x / (float)_chunk_size);
+        int chunk_idx_y = floor(it.y / (float)_chunk_size);
 
-        float blit_x = (_cell_draw_queue[_current_queue_idx].x % _grid_texture_width) + 0.5;
+        if (chunk_idx_x < _chunk_render_left
+                || chunk_idx_x >= _chunk_render_right
+                || chunk_idx_y < _chunk_render_top
+                || chunk_idx_y >= _chunk_render_bottom)
+            return;
+
+        float blit_x = (it.x % _grid_texture_width) + 0.5;
         if (blit_x < 0) blit_x += _grid_texture_width;
 
-        float blit_y = (_cell_draw_queue[_current_queue_idx].y % _grid_texture_height) + 0.5;
+        float blit_y = (it.y % _grid_texture_height) + 0.5;
         if (blit_y < 0) blit_y += _grid_texture_height;
 
-        ADD_VERTEX(blit_x, blit_y, _cell_draw_queue[_current_queue_idx].color);
+        ADD_VERTEX(blit_x, blit_y, it.color);
     }
 }
-
