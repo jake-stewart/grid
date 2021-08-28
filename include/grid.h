@@ -65,6 +65,7 @@ public:
 
     int _queue_max_idx = 0;
     int _current_queue_idx = 0;
+    bool _copy_cell_queue = false;
     std::vector<QueuedCell> _cell_draw_queue;
 
     sf::Color getCell(int x, int y);
