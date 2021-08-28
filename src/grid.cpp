@@ -79,6 +79,11 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
 
     _zoom_bounce_duration = 0.2;
 
+    // default
+    _foreground_color = sf::Color{0x54, 0x5d, 0x66};
+    _background_color = sf::Color{0xd0, 0xd5, 0xde};
+    _gridline_color   = sf::Color{0x75, 0x83, 0x8e};
+
     // solarized
     //_foreground_color = sf::Color{0xEE, 0xE8, 0xD5};
     //_background_color = sf::Color{0x00, 0x2b, 0x36};
@@ -95,9 +100,9 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
     //_gridline_color   = sf::Color{0x45, 0x41, 0x3D};
 
     // one dark
-    _foreground_color = sf::Color{0xAB, 0xB2, 0xBF};
-    _background_color = sf::Color{0x28, 0x2C, 0x34};
-    _gridline_color   = sf::Color{0x38, 0x3C, 0x46};
+    //_foreground_color = sf::Color{0xAB, 0xB2, 0xBF};
+    //_background_color = sf::Color{0x28, 0x2C, 0x34};
+    //_gridline_color   = sf::Color{0x38, 0x3C, 0x46};
 
     // boring light
     // _foreground_color = sf::Color{0x00, 0x00, 0x00};
@@ -242,6 +247,14 @@ void Grid::mainloop() {
         }
         _window.display();
         incrementTimer();
+        if (_copy_cell_queue) {
+            _copy_cell_queue = false;
+            if (_cell_draw_queue.size() < 500)
+                drawCellQueue();
+            else
+                drawScreen();
+            copyCellDrawQueue();
+        }
         _n_frames++;
     }
 }

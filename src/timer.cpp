@@ -28,6 +28,7 @@ void Grid::threadFunc() {
             _thread_finished = true;
         }
     }
+    _copy_cell_queue = true;
 }
 
 void Grid::startTimer() {
