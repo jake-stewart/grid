@@ -9,10 +9,11 @@ void Grid::setScale(float scale) {
     float n_cells_x = _screen_width / scale;
     float n_cells_y = _screen_height / scale;
 
+    int n = (_render_distance - 1) * _chunk_size;
     // if grid texture is not large enough to support this many cells at this scale
-    if (n_cells_x > _max_cells_x || n_cells_y > _max_cells_y) {
-        float min_scale_x = (float)_screen_width / _max_cells_x;
-        float min_scale_y = (float)_screen_height / _max_cells_y;
+    if (n_cells_x > n || n_cells_y > n) {
+        float min_scale_x = (float)_screen_width / n;
+        float min_scale_y = (float)_screen_height / n;
 
         // then set the scale to be as small as possible
         // and stop zooming, since there is no point continuing to zoom out

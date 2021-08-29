@@ -247,14 +247,6 @@ void Grid::mainloop() {
         }
         _window.display();
         incrementTimer();
-        if (_copy_cell_queue) {
-            _copy_cell_queue = false;
-            if (_cell_draw_queue.size() < 500)
-                drawCellQueue();
-            else
-                drawScreen();
-            copyCellDrawQueue();
-        }
         _n_frames++;
     }
 }

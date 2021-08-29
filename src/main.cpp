@@ -20,8 +20,8 @@ bool right_mouse_pressed = false;
 
 int iterations_per_tick = 1;
 
-float speeds[9]     = {1, 0.5, 0.25, 0.1, 0.05, 0.01, 0.005, 0.002, 0.0};
-float iterations[9] = {1,   1,    1,   1,    1,    1,     1,     1,   1};
+float speeds[9]     = {1, 0.5, 0.25, 0.1, 0.05, 0.01, 0.005, 0.0025, 0};
+float iterations[9] = {1,   1,    1,   1,    1,    1,     1,      1, 5};
 
 
 void Grid::onKeyPressEvent(int key_code) {
@@ -130,49 +130,20 @@ void Grid::onTimerEvent() {
         doIteration();
         change_list.clear();
 
-        auto add_it = cells_to_add.begin();
-        auto add_end = cells_to_add.end();
-
-        auto del_it = cells_to_delete.begin();
-        auto del_end = cells_to_delete.end();
-
-        int x, y;
-
-        while (add_it != add_end && del_it != del_end) {
-            x = (*add_it) >> 32;
-            y = *add_it;
-            alive_cells.insert(*add_it);
+        for (auto it: cells_to_add) {
+            int x = it >> 32;
+            int y = it;
+            alive_cells.insert(it);
             addCell(x, y);
             threadDrawCell(x, y, _foreground_color);
-
-            x = (*del_it) >> 32;
-            y = *del_it;
-            alive_cells.erase(*del_it);
-            deleteCell(x, y);
-            threadDrawCell(x, y, _background_color);
-
-            add_it++;
-            del_it++;
         }
 
-        while (add_it != add_end) {
-            x = (*add_it) >> 32;
-            y = *add_it;
-            alive_cells.insert(*add_it);
-            addCell(x, y);
-            threadDrawCell(x, y, _foreground_color);
-
-            add_it++;
-        }
-
-        while (del_it != del_end) {
-            x = (*del_it) >> 32;
-            y = *del_it;
-            alive_cells.erase(*del_it);
+        for (auto it: cells_to_delete) {
+            int x = it >> 32;
+            int y = it;
+            alive_cells.erase(it);
             deleteCell(x, y);
             threadDrawCell(x, y, _background_color);
-
-            del_it++;
         }
     }
 }

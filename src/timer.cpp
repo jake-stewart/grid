@@ -2,33 +2,32 @@
 #include <thread>
 #include <iostream>
 
-
-void Grid::endThread() {
-    if (!_thread_running)
-        return;
-    _thread_running = false;
-    _thread.join();
-}
-
 void Grid::startThread() {
-    if (_thread_running)
+    _thread_running = true;
+
+    if (_thread_state == _THREAD_WAITING_FOR_JOIN)
+        _thread.join();
+
+    else if (_thread_state)
         return;
 
-    _thread_running = true;
+    _thread_state = _THREAD_FINISHED;
     _thread = std::thread(&Grid::threadFunc, this);
 }
 
 void Grid::threadFunc() {
-    while (_thread_running) {
-        if (_start_thread) {
-            _start_thread = false;
-
-            copyCellDrawQueue();
+    while (!_kill_thread && (_thread_running || _thread_state != _THREAD_FINISHED)) {
+        if (_thread_state == _THREAD_STARTING) {
+            _thread_state = _THREAD_STARTED;
             onTimerEvent();
-            _thread_finished = true;
+            _thread_state = _THREAD_WAITING_FOR_SWAP;
+        }
+        else if (_thread_state == _THREAD_SWAPPING) {
+            copyCellDrawQueue();
+            _thread_state = _THREAD_FINISHED;
         }
     }
-    _copy_cell_queue = true;
+    _thread_state = _THREAD_WAITING_FOR_JOIN;
 }
 
 void Grid::startTimer() {
@@ -46,6 +45,10 @@ void Grid::setTimer(float timer_interval) {
     _timer.restart();
 }
 
+void Grid::endThread() {
+    _thread_running = false;
+}
+
 void Grid::stopTimer() {
     if (!_timer_active)
         return;
@@ -58,9 +61,11 @@ void Grid::incrementTimer() {
     if (!_timer_active)
         return;
 
-    if (_thread_finished && _timer.getElapsedTime().asSeconds() > _timer_interval) {
-        _timer.restart();
-
+    if (_thread_state == _THREAD_WAITING_FOR_SWAP) {
+        if (_cell_draw_queue.size() < 500)
+            drawCellQueue();
+        else
+            drawScreen();
         if (_chunks_pointer == &_chunks) {
             _chunks_pointer = &_chunks_buffer;
             _thread_chunks_pointer = &_chunks;
@@ -69,14 +74,12 @@ void Grid::incrementTimer() {
             _chunks_pointer = &_chunks;
             _thread_chunks_pointer = &_chunks_buffer;
         }
+        _thread_state = _THREAD_SWAPPING;
+    }
 
-        if (_cell_draw_queue.size() < 500)
-            drawCellQueue();
-        else
-            drawScreen();
-
-        _thread_finished = false;
-        _start_thread = true;
+    if (_thread_state == _THREAD_FINISHED && !_chunk_queue.size() && _timer.getElapsedTime().asSeconds() > _timer_interval) {
+        _timer.restart();
+        _thread_state = _THREAD_STARTING;
     }
 }
 
