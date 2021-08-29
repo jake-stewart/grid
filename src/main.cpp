@@ -19,9 +19,8 @@ bool left_mouse_pressed = false;
 bool right_mouse_pressed = false;
 
 int iterations_per_tick = 1;
-
-float speeds[9]     = {1, 0.5, 0.25, 0.1, 0.05, 0.01, 0.005, 0.0025, 0};
-float iterations[9] = {1,   1,    1,   1,    1,    1,     1,      1, 5};
+float speeds[5]     = {1, 0.25, 0.05, 0.01, 0.0};
+float iterations[5] = {1,   1,     1,    1,   3};
 
 
 void Grid::onKeyPressEvent(int key_code) {
@@ -37,20 +36,11 @@ void Grid::onKeyPressEvent(int key_code) {
             }
             break;
 
-        case sf::Keyboard::Num0:
-            iterations_per_tick = 9;
-            setTimer(0);
-            break;
-
         case sf::Keyboard::Num1:
         case sf::Keyboard::Num2:
         case sf::Keyboard::Num3:
         case sf::Keyboard::Num4:
         case sf::Keyboard::Num5:
-        case sf::Keyboard::Num6:
-        case sf::Keyboard::Num7:
-        case sf::Keyboard::Num8:
-        case sf::Keyboard::Num9:
             int speed_idx = key_code - sf::Keyboard::Num1;
             iterations_per_tick = iterations[speed_idx];
             setTimer(speeds[speed_idx]);
@@ -202,7 +192,7 @@ void Grid::onMouseReleaseEvent(int x, int y, int button) {
 }
 
 void Grid::onStartEvent() {
-    int speed_idx = 3;
+    int speed_idx = 1;
     iterations_per_tick = iterations[speed_idx];
     setTimer(speeds[speed_idx]);
 }

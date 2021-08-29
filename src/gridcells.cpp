@@ -37,7 +37,6 @@ void Grid::updateChunkQueue() {
     int n_chunks_width = ceil(_screen_width / (_chunk_size * _scale));
     int spare_chunks_x = _render_distance - n_chunks_width;
     if (spare_chunks_x < 0) spare_chunks_x = 0;
-    std::cout << spare_chunks_x / 2 << std::endl;
     int chunk_render_left = _chunk_x - spare_chunks_x / 2;
     int chunk_render_right = chunk_render_left + _render_distance;
 
@@ -155,10 +154,6 @@ void Grid::drawScreen() {
     if (spare_chunks_y < 0) spare_chunks_y = 0;
     int _chunk_render_top = _chunk_y - spare_chunks_y / 2;
     int _chunk_render_bottom = _chunk_render_top + _render_distance;
-
-    //std::cout << _chunk_render_left << ", " << _chunk_render_right << std::endl;
-    //std::cout << _chunk_render_top << ", " << _chunk_render_bottom << std::endl;
-    //std::cout << std::endl;
 
     for (int x = _chunk_render_left; x < _chunk_render_right; x++) {
         for (int y = _chunk_render_top; y < _chunk_render_bottom; y++) {
