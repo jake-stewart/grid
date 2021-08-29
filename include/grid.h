@@ -4,8 +4,11 @@
 #include <SFML/Graphics.hpp>
 #include <unordered_map>
 #include <vector>
-#include <math.h>
+#include <string>
 #include <thread>
+
+
+const static int _chunk_size = 256;
 
 struct QueuedCell
 {
@@ -13,6 +16,14 @@ struct QueuedCell
     int y;
     sf::Color color;
 };
+
+struct Letter
+{
+    char letter;
+    sf::Color color;
+    int style;
+};
+
 
 struct Coord
 {
@@ -32,6 +43,12 @@ struct Coord
     }
 };
  
+struct Chunk
+{
+    sf::Uint8 pixels [_chunk_size * _chunk_size * 4];
+    std::unordered_map<uint64_t, Letter> letters;
+};
+
 // The specialized hash function for `unordered_map` keys
 struct hash_fn
 {
@@ -119,10 +136,11 @@ private:
 
     // TODO: rename
     int _fill_x;
+    bool _mouse_moved = false;
     int _mouse_cell_x = 0;
     int _mouse_cell_y = 0;
 
-	bool _screen_changed = true;
+	  bool _screen_changed = true;
 
     // last mouse location on screen
     int _mouse_x = 0;
@@ -207,16 +225,17 @@ private:
     sf::Texture _chunk_texture;
     sf::Sprite _chunk_sprite;
     int _n_frames = 0;
-    const static int _chunk_size = 256;
     int _render_distance;
     int _chunk_x_cell = 0;
     int _chunk_y_cell = 0;
     int _chunk_x = 0;
     int _chunk_y = 0;
-    std::unordered_map<uint64_t, sf::Uint8[_chunk_size * _chunk_size * 4]> _chunks;
-    std::unordered_map<uint64_t, sf::Uint8[_chunk_size * _chunk_size * 4]> _chunks_buffer;
-    std::unordered_map<uint64_t, sf::Uint8[_chunk_size * _chunk_size * 4]> * _chunks_pointer = &_chunks;
-    std::unordered_map<uint64_t, sf::Uint8[_chunk_size * _chunk_size * 4]> * _thread_chunks_pointer = &_chunks_buffer;
+    int _n_chunks_width = 0;
+    int _n_chunks_height = 0;
+    std::unordered_map<uint64_t, Chunk> _chunks;
+    std::unordered_map<uint64_t, Chunk> _chunks_buffer;
+    std::unordered_map<uint64_t, Chunk> * _chunks_pointer = &_chunks;
+    std::unordered_map<uint64_t, Chunk> * _thread_chunks_pointer = &_chunks_buffer;
     std::vector<std::pair<int, int>> _chunk_queue;
 
     float _frame_duration;
@@ -296,7 +315,10 @@ private:
     void renderGridlinesAA();
 
     // grid.cpp
+    sf::Font _font;
     void render();
+    void addText(int x, int y, std::string text, sf::Color color, int style);
+    void renderText();
 
     // events.cpp
     void handleEvents();
@@ -328,7 +350,7 @@ private:
     void onMousePress(int button);
     void onMouseRelease(int button);
     void onMouseScroll(int wheel, float delta);
-    void calculateTraversedCells(int target_x, int target_y);
+    void calculateTraversedCells();
     void recordMousePos();
     void onPanButtonPress();
     void onPanButtonRelease();
