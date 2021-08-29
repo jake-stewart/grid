@@ -1,4 +1,5 @@
 #include <SFML/Graphics.hpp>
+#include <math.h>
 #include "grid.h"
 
 #define ADD_VERTEX(x, y, color) _vertex_array.append(sf::Vertex({x, y}, color))

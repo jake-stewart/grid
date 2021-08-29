@@ -33,15 +33,60 @@ void Grid::render() {
     else _window.draw(_grid_sprite);
 }
 
+void Grid::renderText() {
+    int character_size;
+    if (_scale < 5) character_size = 5;
+    else if (_scale < 11) character_size = 11;
+    else if (_scale < 15) character_size = 15;
+    else if (_scale < 20) character_size = 20;
+    else if (_scale < 45) character_size = 45;
+    else if (_scale < 75) character_size = 75;
+    else if (_scale < 160) character_size = 160;
+    else character_size = 300;
+
+    float increased_scale = _scale / character_size;
+
+    sf::Text text;
+    text.setFont(_font);
+    text.scale(increased_scale, increased_scale);
+    text.setCharacterSize(character_size);
+
+
+    for (int chunk_x = _chunk_x; chunk_x <= _chunk_x + _n_chunks_width; chunk_x++) {
+        for (int chunk_y = _chunk_y; chunk_y <= _chunk_y + _n_chunks_height; chunk_y++) {
+
+            uint64_t idx = (uint64_t)chunk_x << 32 | (uint32_t)chunk_y;
+            auto chunk = _chunks_pointer->find(idx);
+            if (chunk == _chunks_pointer->end())
+                continue;
+
+            for (auto it: chunk->second.letters) {
+                int x = it.first >> 32;
+                int y = (int)it.first;
+
+                float blit_x = (x - (_chunk_x * _chunk_size + _cam_x_decimal) + 0.2) * _scale;
+                float blit_y = (y - (_chunk_y * _chunk_size + _cam_y_decimal) - 0.125) * _scale;
+
+                text.setString(it.second.letter);
+                text.setFillColor(it.second.color);
+                text.setStyle(it.second.style);
+                text.setPosition(blit_x, blit_y);
+                //text.setOrigin(text.getLocalBounds().left/2.0f,text.getLocalBounds().top);
+                _window.draw(text);
+            }
+        }
+    }
+}
+
 void Grid::updateChunkQueue() {
-    int n_chunks_width = ceil(_screen_width / (_chunk_size * _scale));
-    int spare_chunks_x = _render_distance - n_chunks_width;
+    _n_chunks_width = ceil(_screen_width / (_chunk_size * _scale));
+    int spare_chunks_x = _render_distance - _n_chunks_width;
     if (spare_chunks_x < 0) spare_chunks_x = 0;
     int chunk_render_left = _chunk_x - spare_chunks_x / 2;
     int chunk_render_right = chunk_render_left + _render_distance;
 
-    int n_chunks_height = ceil(_screen_height / (_chunk_size * _scale));
-    int spare_chunks_y = _render_distance - n_chunks_height;
+    _n_chunks_height = ceil(_screen_height / (_chunk_size * _scale));
+    int spare_chunks_y = _render_distance - _n_chunks_height;
     if (spare_chunks_y < 0) spare_chunks_y = 0;
     int chunk_render_top = _chunk_y - spare_chunks_y / 2;
     int chunk_render_bottom = chunk_render_top + _render_distance;
@@ -129,7 +174,7 @@ void Grid::updateChunks() {
             //    blit_x, blit_y,
             //    _chunk_size, _chunk_size
             //);
-            _chunk_texture.update(chunk->second);
+            _chunk_texture.update(chunk->second.pixels);
             _chunk_sprite.setPosition(blit_x, blit_y);
             _grid_render_texture.draw(_chunk_sprite);
         }

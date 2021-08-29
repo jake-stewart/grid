@@ -1,5 +1,6 @@
 #include "grid.h"
 #include <iostream>
+#include <math.h>
 
 void Grid::pan(float x, float y) {
     _cam_x_decimal += x;
@@ -36,6 +37,6 @@ void Grid::applyPanVel(float delta_time) {
         _pan_vel_x = 0;
         _pan_vel_y = 0;
     }
-    onMouseMotion(_mouse_x, _mouse_y);
+    _mouse_moved = true;
 }
 

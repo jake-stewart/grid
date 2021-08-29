@@ -1,5 +1,6 @@
 #include <SFML/Graphics.hpp>
 #include <iostream>
+#include <math.h>
 #include "grid.h"
 
 #define ADD_VERTEX(x, y, color) _vertex_array.append(sf::Vertex({x, y}, color))
@@ -129,7 +130,11 @@ sf::Color Grid::getCell(int x, int y) {
 
     int pixel_idx = (pixel_y * _chunk_size + pixel_x) * 4;
 
-    return sf::Color{chunk->second[pixel_idx], chunk->second[pixel_idx + 1], chunk->second[pixel_idx + 2]};
+    return sf::Color{
+        chunk->second.pixels[pixel_idx],
+        chunk->second.pixels[pixel_idx + 1],
+        chunk->second.pixels[pixel_idx + 2]
+    };
 }
 
 void Grid::drawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g) {
@@ -146,18 +151,18 @@ void Grid::drawCell(int x, int y, sf::Color color) {
     auto chunk = _chunks_pointer->find(chunk_idx);
 
     if (chunk == _chunks_pointer->end()) {
-        auto pixels = (*_chunks_pointer)[chunk_idx];
-        auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx];
+        auto pixels = (*_chunks_pointer)[chunk_idx].pixels;
+        auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx].pixels;
         for (int i = 0; i < _chunk_size * _chunk_size * 4; i += 4) {
             pixels[i] = _background_color.r;
             pixels[i + 1] = _background_color.g;
             pixels[i + 2] = _background_color.b;
             pixels[i + 3] = 255;
 
-            pixels_buffer[i] = _background_color.r;
-            pixels_buffer[i + 1] = _background_color.g;
-            pixels_buffer[i + 2] = _background_color.b;
-            pixels_buffer[i + 3] = 255;
+            pixels[i] = _background_color.r;
+            pixels[i + 1] = _background_color.g;
+            pixels[i + 2] = _background_color.b;
+            pixels[i + 3] = 255;
         }
     }
 
@@ -169,8 +174,8 @@ void Grid::drawCell(int x, int y, sf::Color color) {
 
     int pixel_idx = (pixel_y * _chunk_size + pixel_x) * 4;
 
-    auto pixels = (*_chunks_pointer)[chunk_idx];
-    auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx];
+    auto pixels = (*_chunks_pointer)[chunk_idx].pixels;
+    auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx].pixels;
 
     pixels[pixel_idx] = color.r;
     pixels[pixel_idx + 1] = color.g;
@@ -198,6 +203,49 @@ void Grid::drawCell(int x, int y, sf::Color color) {
 }
 
 
+bool nonPrintableAscii(char c) {  
+    return c < 32 || c > 126;   
+} 
+void stripUnicode(std::string & text) { 
+    text.erase(remove_if(text.begin(), text.end(), nonPrintableAscii), text.end());  
+}
+
+void Grid::addText(int x, int y, std::string text, sf::Color color, int style) {
+    int chunk_idx_y = floor(y / (float)_chunk_size);
+
+    stripUnicode(text);
+    auto letters = text.c_str();
+    for (int i = 0; i < text.length(); i++) {
+        if (letters[i] == ' ') continue;
+
+        int chunk_idx_x = floor((x + i) / (float)_chunk_size);
+
+        uint64_t chunk_idx = (uint64_t)chunk_idx_x << 32 | (uint32_t)chunk_idx_y;
+
+        auto chunk = _chunks_pointer->find(chunk_idx);
+
+        if (chunk == _chunks_pointer->end()) {
+            auto pixels = (*_chunks_pointer)[chunk_idx].pixels;
+            auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx].pixels;
+            for (int i = 0; i < _chunk_size * _chunk_size * 4; i += 4) {
+                pixels[i] = _background_color.r;
+                pixels[i + 1] = _background_color.g;
+                pixels[i + 2] = _background_color.b;
+                pixels[i + 3] = 255;
+
+                pixels[i] = _background_color.r;
+                pixels[i + 1] = _background_color.g;
+                pixels[i + 2] = _background_color.b;
+                pixels[i + 3] = 255;
+            }
+        }
+
+        uint64_t idx = (uint64_t)(x + i) << 32 | (uint32_t)y;
+        (*_chunks_pointer)[chunk_idx].letters[idx] = {letters[i], color, style};
+        (*_thread_chunks_pointer)[chunk_idx].letters[idx] = {letters[i], color, style};
+    }
+}
+
 void Grid::threadDrawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g) {
     drawCell(x, y, sf::Color{r, g, b});
 }
@@ -212,7 +260,7 @@ void Grid::threadDrawCell(int x, int y, sf::Color color) {
     auto chunk = _thread_chunks_pointer->find(chunk_idx);
 
     if (chunk == _thread_chunks_pointer->end()) {
-        auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx];
+        auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx].pixels;
         for (int i = 0; i < _chunk_size * _chunk_size * 4; i += 4) {
             pixels_buffer[i] = _background_color.r;
             pixels_buffer[i + 1] = _background_color.g;
@@ -229,7 +277,7 @@ void Grid::threadDrawCell(int x, int y, sf::Color color) {
 
     int pixel_idx = (pixel_y * _chunk_size + pixel_x) * 4;
 
-    auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx];
+    auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx].pixels;
     pixels_buffer[pixel_idx] = color.r;
     pixels_buffer[pixel_idx + 1] = color.g;
     pixels_buffer[pixel_idx + 2] = color.b;
@@ -245,7 +293,7 @@ void Grid::copyCellDrawQueue() {
         auto chunk = _thread_chunks_pointer->find(chunk_idx);
 
         if (chunk == _thread_chunks_pointer->end()) {
-            auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx];
+            auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx].pixels;
             for (int i = 0; i < _chunk_size * _chunk_size * 4; i += 4) {
                 pixels_buffer[i] = _background_color.r;
                 pixels_buffer[i + 1] = _background_color.g;
@@ -262,7 +310,7 @@ void Grid::copyCellDrawQueue() {
 
         int pixel_idx = (pixel_y * _chunk_size + pixel_x) * 4;
 
-        auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx];
+        auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx].pixels;
         pixels_buffer[pixel_idx] = it.color.r;
         pixels_buffer[pixel_idx + 1] = it.color.g;
         pixels_buffer[pixel_idx + 2] = it.color.b;

@@ -14,19 +14,17 @@ void Grid::onMouseMotion(int x, int y) {
     if (_pan_button_pressed)
         pan((_mouse_x - x) / _scale,
             (_mouse_y - y) / _scale);
+    else
+        _mouse_moved = true;
 
-    int mouse_cell_x = _chunk_x_cell + (int)floor(_mouse_x / _scale + _cam_x_decimal);
-    int mouse_cell_y = _chunk_y_cell + (int)floor(_mouse_y / _scale + _cam_y_decimal);
-
-    calculateTraversedCells(mouse_cell_x, mouse_cell_y);
-
-    _mouse_cell_x = mouse_cell_x;
-    _mouse_cell_y = mouse_cell_y;
     _mouse_x = x;
     _mouse_y = y;
 }
 
-void Grid::calculateTraversedCells(int target_x, int target_y) {
+void Grid::calculateTraversedCells() {
+    int target_x = _chunk_x_cell + (int)floor(_mouse_x / _scale + _cam_x_decimal);
+    int target_y = _chunk_y_cell + (int)floor(_mouse_y / _scale + _cam_y_decimal);
+
     float angle = atan2(target_x - _mouse_cell_x, target_y - _mouse_cell_y);
     float x_vel = sin(angle);
     float y_vel = cos(angle);
@@ -89,11 +87,14 @@ void Grid::calculateTraversedCells(int target_x, int target_y) {
         last_x = cell_x;
         last_y = cell_y;
     }
+    _mouse_cell_x = target_x;
+    _mouse_cell_y = target_y;
 }
 
 void Grid::onMousePress(int button) {
-    if (button == _pan_button)
+    if (button == _pan_button) {
         onPanButtonPress();
+    }
 
     else onMousePressEvent(_mouse_cell_x, _mouse_cell_y, button);
 }

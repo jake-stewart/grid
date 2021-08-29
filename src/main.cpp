@@ -192,6 +192,9 @@ void Grid::onMouseReleaseEvent(int x, int y, int button) {
 }
 
 void Grid::onStartEvent() {
+    addText(1,  0, "THIS IS A TEST", _foreground_color, 0);
+    addText(1,  1, "YO YO", sf::Color::Red, sf::Text::Italic);
+
     int speed_idx = 1;
     iterations_per_tick = iterations[speed_idx];
     setTimer(speeds[speed_idx]);

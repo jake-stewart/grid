@@ -65,7 +65,7 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
     _frame_duration = 1.0 / _max_fps;
 
     _pan_button = sf::Mouse::Middle;
-    _min_pan_vel = 1;
+    _min_pan_vel = 0.01;
     _weak_pan_friction = 5;
     _strong_pan_friction = 20;
 
@@ -75,7 +75,7 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
 
     _zoom_friction = 5;
     _zoom_speed = 1;
-    _min_zoom_vel = 0.01;
+    _min_zoom_vel = 0.1;
 
     _zoom_bounce_duration = 0.2;
 
@@ -149,6 +149,9 @@ int Grid::initialize() {
     else
         _render_distance = _grid_texture_height / _chunk_size;
 
+    if (!_font.loadFromFile("NotoSansMono-Bold.ttf"))
+        return 1;
+
     _max_cells_x = _grid_texture_width - 2;
     _max_cells_y = _grid_texture_height - 2;
     _grid_render_texture.create(_grid_texture_width, _grid_texture_height);
@@ -214,9 +217,15 @@ void Grid::mainloop() {
         applyZoomVel(delta_time);
         applyPanVel(delta_time);
 
+        if (_mouse_moved) {
+            calculateTraversedCells();
+            _mouse_moved = false;
+        }
+
         if (_pan_button_pressed && _mouse_timer.getElapsedTime()
                 .asSeconds() > _t_per_mouse_pos)
             recordMousePos();
+
 
         if (_grid_moved) {
             updateChunkQueue();
@@ -238,6 +247,7 @@ void Grid::mainloop() {
 
         //_window.clear(_background_color);
         render();
+        renderText();
 
         if (_display_grid && _grid_thickness > 0) {
           if (_antialias_enabled)
@@ -248,5 +258,6 @@ void Grid::mainloop() {
         _window.display();
         incrementTimer();
         _n_frames++;
+
     }
 }

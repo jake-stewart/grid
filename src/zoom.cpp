@@ -1,4 +1,5 @@
 #include "grid.h"
+#include <math.h>
 
 float quadraticBezier(float p0, float p1, float p2, float t) {
     return pow(1 - t,  2) * p0 + (1 - t) * 2 * t * p1 + t * t * p2;
