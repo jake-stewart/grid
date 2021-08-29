@@ -65,7 +65,6 @@ public:
 
     int _queue_max_idx = 0;
     int _current_queue_idx = 0;
-    bool _copy_cell_queue = false;
     std::vector<QueuedCell> _cell_draw_queue;
 
     sf::Color getCell(int x, int y);
@@ -85,9 +84,19 @@ private:
     float _grid_fade_duration;
 
     std::thread _thread;
+
+    int _THREAD_INACTIVE = 0;
+    int _THREAD_STARTING = 1;
+    int _THREAD_STARTED = 2;
+    int _THREAD_WAITING_FOR_SWAP = 3;
+    int _THREAD_SWAPPING = 4;
+    int _THREAD_FINISHED = 5;
+    int _THREAD_WAITING_FOR_JOIN = 6;
+    int _THREAD_JOINED = 7;
+
+    int _thread_state = _THREAD_INACTIVE;
+    bool _kill_thread = false;
     bool _thread_running = false;
-    bool _start_thread = false;
-    bool _thread_finished = true;
 
     bool _antialias_enabled;
 
@@ -198,7 +207,7 @@ private:
     sf::Texture _chunk_texture;
     sf::Sprite _chunk_sprite;
     int _n_frames = 0;
-    const static int _chunk_size = 64;
+    const static int _chunk_size = 256;
     int _render_distance;
     int _chunk_x_cell = 0;
     int _chunk_y_cell = 0;
