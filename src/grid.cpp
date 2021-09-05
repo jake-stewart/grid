@@ -2,6 +2,7 @@
 #include <math.h>
 #include <climits>
 #include "grid.h"
+#include "font.h"
 #include <iostream>
 
 #define RAND() static_cast <float> (rand()) / static_cast <float> (RAND_MAX)
@@ -29,6 +30,19 @@
 // [ ] comments + cleanup
 // [ ] cell deletion
 // [ ] extendability
+
+const char * shader_source =
+    "#version 130\n"
+    "uniform sampler2D tex;"
+    "uniform float scale;"
+    "uniform vec2 geometry;"
+    "out vec4 frag_color;"
+    "void main() {"
+    "    vec2 pixel = gl_TexCoord[0].xy * geometry;"
+    "    vec2 uv = floor(pixel) + 0.5;"
+    "    uv += (1.0 - clamp((1.0 - fract(pixel)) * scale, 0.0, 1.0));"
+    "    frag_color = texture(tex, uv / geometry);"
+    "}";
 
 Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
     //_cam_x = 2147483648;
@@ -61,7 +75,7 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
 
     _t_per_mouse_pos = 0.01;
 
-    _max_fps = 150;
+    _max_fps = 144;
     _frame_duration = 1.0 / _max_fps;
 
     _pan_button = sf::Mouse::Middle;
@@ -73,11 +87,17 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
     _max_scale = 300;
     _min_scale = 2;
 
-    _zoom_friction = 5;
+    _zoom_friction = 0.998;
     _zoom_speed = 1;
-    _min_zoom_vel = 0.1;
+    _pan_speed = 0.8;
+    _min_zoom_vel = 0.01;
+    _max_zoom_vel = 100.0;
 
-    _zoom_bounce_duration = 0.2;
+    _bounce_duration = 0.2;
+
+    _bounce_cutoff = 0.5;
+    _min_bezier_cutoff = _min_scale - _min_scale * _bounce_cutoff;
+    _max_bezier_cutoff = _max_scale + _max_scale * _bounce_cutoff;
 
     // default
     _foreground_color = sf::Color{0x54, 0x5d, 0x66};
@@ -133,7 +153,8 @@ int Grid::initialize() {
     _view = _window.getDefaultView();
 
     // vertices used for batch drawing multiple grid lines efficiently
-    _vertex_array.setPrimitiveType(sf::Quads);
+    _cell_vertexes.setPrimitiveType(sf::Points);
+    _gridline_vertexes.setPrimitiveType(sf::Quads);
 
     _chunk_texture.create(_chunk_size, _chunk_size);
     _chunk_sprite.setTexture(_chunk_texture, true);
@@ -149,54 +170,28 @@ int Grid::initialize() {
     else
         _render_distance = _grid_texture_height / _chunk_size;
 
-    if (!_font.loadFromFile("NotoSansMono-Bold.ttf"))
-        return 1;
+    _font.loadFromMemory(NotoSansMonoBoldTTF, NotoSansMonoBoldTTF_len);
 
     _max_cells_x = _grid_texture_width - 2;
     _max_cells_y = _grid_texture_height - 2;
+
     _grid_render_texture.create(_grid_texture_width, _grid_texture_height);
     _grid_render_texture.clear(_background_color);
-    //_grid_texture = _grid_render_texture.getTexture();
-
-
+    _grid_render_texture.setRepeated(true);
     _grid_sprite.setTexture(_grid_render_texture.getTexture());
 
-    // when the grid is panned beyond the bounds of the grid texture,
-    // the cells are wrapped to the other side of the texture.
-    // setting the texture to be repeated allows for the texture to automatically
-    // wrap when rendering
-    _grid_render_texture.setRepeated(true);
-
-    // pixel which are manipulated before being used to update the grid texture
-    // int n_pixels = _grid_texture_width * _grid_texture_height * 4;
-    // _pixels = new sf::Uint8[n_pixels];
-    // for (int i = 0; i < n_pixels; i++)
-    //     _pixels[i] = 255;
-
-    const char * shader_source =
-        "#version 130\n"
-        "uniform sampler2D tex;"
-        "uniform float scale;"
-        "uniform vec2 geometry;"
-        "out vec4 frag_color;"
-        "void main() {"
-        "    vec2 pixel = gl_TexCoord[0].xy * geometry;"
-        "    vec2 uv = floor(pixel) + 0.5;"
-        "    uv += (1.0 - clamp((1.0 - fract(pixel)) * scale, 0.0, 1.0));"
-        "    frag_color = texture(tex, uv / geometry);"
-        "}";
-
     if (sf::Shader::isAvailable()) {
-        _shader.loadFromMemory(shader_source, sf::Shader::Fragment);
-        _shader.setUniform("tex", _grid_render_texture.getTexture());
-        _shader.setUniform("geometry", sf::Vector2f(_grid_texture_width, _grid_texture_height));
         _antialias_enabled = true;
+        _shader.loadFromMemory(shader_source, sf::Shader::Fragment);
+        _shader.setUniform("geometry", sf::Vector2f(_grid_texture_width, _grid_texture_height));
+        _shader.setUniform("tex", _grid_render_texture.getTexture());
+        _grid_render_texture.setSmooth(true);
     }
-
-    _grid_render_texture.setSmooth(_antialias_enabled);
 
     setGridlinesFade(7, 20);
     setGridThickness(0.08);
+
+    startThread();
 
     return 0;
 }
@@ -217,33 +212,77 @@ void Grid::mainloop() {
         applyZoomVel(delta_time);
         applyPanVel(delta_time);
 
+
         if (_mouse_moved) {
-            calculateTraversedCells();
+            if (_pan_button_pressed) {
+                int dx = _mouse_x - _new_mouse_x;
+                int dy = _mouse_y - _new_mouse_y;
+                pan(dx / _scale, dy / _scale);
+
+                float dt = _mouse_timer.restart().asSeconds();
+
+                if (!_mouse_vel_x)
+                    _mouse_vel_x = dx / dt;
+                else
+                    _mouse_vel_x = (_mouse_vel_x + dx / dt) / 2.0;
+
+                if (!_mouse_vel_y)
+                    _mouse_vel_y = dy / dt;
+                else
+                    _mouse_vel_y = (_mouse_vel_y + dy / dt) / 2.0;
+
+                _mouse_x = _new_mouse_x;
+                _mouse_y = _new_mouse_y;
+            }
+            else {
+                _mouse_x = _new_mouse_x;
+                _mouse_y = _new_mouse_y;
+                calculateTraversedCells();
+            }
             _mouse_moved = false;
         }
 
-        if (_pan_button_pressed && _mouse_timer.getElapsedTime()
-                .asSeconds() > _t_per_mouse_pos)
-            recordMousePos();
+        else if (_pan_button_pressed) {
+            _mouse_vel_x = _mouse_vel_x / 2.0;
+            _mouse_vel_y = _mouse_vel_y / 2.0;
+        }
 
+        switch (_thread_state) {
+            case inactive:
+                if (_animated_cells.size()) 
+                    animateCells(delta_time);
+
+                if (_cell_vertexes.getVertexCount()) {
+                    _grid_render_texture.draw(_cell_vertexes);
+                    _cell_vertexes.clear();
+                }
+                break;
+            case swapping:
+                if (_cell_vertexes.getVertexCount()) {
+                    _grid_render_texture.draw(_cell_vertexes);
+                    _cell_vertexes.clear();
+                }
+
+                _buffer_idx = !_buffer_idx;
+
+                _chunk_render_left = _old_chunk_render_left;
+                _chunk_render_right = _old_chunk_render_right;
+                _chunk_render_top = _old_chunk_render_top;
+                _chunk_render_bottom = _old_chunk_render_bottom;
+
+                updateChunkQueue();
+                _grid_moved = false;
+
+                _thread_state = swapped;
+                _cv.notify_one();
+                break;
+        }
 
         if (_grid_moved) {
             updateChunkQueue();
             _grid_moved = false;
         }
         updateChunks();
-
-        if (_animated_cells.size()) 
-          animateCells(delta_time);
-
-        //if (_cell_draw_queue.size())
-        //    drawCellQueue();
-
-        if (_vertex_array.getVertexCount()) {
-            _vertex_array.setPrimitiveType(sf::Points);
-            _grid_render_texture.draw(_vertex_array);
-            _vertex_array.clear();
-        }
 
         //_window.clear(_background_color);
         render();
@@ -255,9 +294,17 @@ void Grid::mainloop() {
           else
             renderGridlines();
         }
-        _window.display();
-        incrementTimer();
+
         _n_frames++;
+        incrementTimer();
+
+        _window.display();
+        // if (_fps_clock.getElapsedTime().asSeconds() >= 1) {
+        //     std::cout << _n_frames << ", " << _n_iterations << std::endl;
+        //     _n_frames = 0;
+        //     _n_iterations = 0;
+        //     _fps_clock.restart();
+        // }
 
     }
 }

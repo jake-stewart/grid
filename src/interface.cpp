@@ -3,7 +3,7 @@
 #include <math.h>
 #include "grid.h"
 
-#define ADD_VERTEX(x, y, color) _vertex_array.append(sf::Vertex({x, y}, color))
+#define ADD_VERTEX(x, y, color) _cell_vertexes.append(sf::Vertex({x, y}, color))
 
 void Grid::setScale(float scale) {
     // calculate how many cells would be visible at the new scale
@@ -107,7 +107,6 @@ int Grid::start() {
     _chunk_render_bottom = _chunk_render_top + _render_distance;
 
     onStartEvent();
-    startThread();
     mainloop();
     return 0;
 }
@@ -117,9 +116,9 @@ sf::Color Grid::getCell(int x, int y) {
     int chunk_idx_y = floor(y / (float)_chunk_size);
 
     uint64_t chunk_idx = (uint64_t)chunk_idx_x << 32 | (uint32_t)chunk_idx_y;
-    auto chunk = _chunks_pointer->find(chunk_idx);
+    auto chunk = _chunks[0].find(chunk_idx);
 
-    if (chunk == _chunks_pointer->end())
+    if (chunk == _chunks[0].end())
         return _background_color;
 
     int pixel_y = y % _chunk_size;
@@ -137,28 +136,21 @@ sf::Color Grid::getCell(int x, int y) {
     };
 }
 
-void Grid::drawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g) {
-    drawCell(x, y, sf::Color{r, g, b});
-}
 
-void Grid::drawCell(int x, int y, sf::Color color) {
+void Grid::threadDrawCell(int x, int y, sf::Color color) {
+    _cell_draw_queue.push_back({x, y, color});
 
     int chunk_idx_x = floor(x / (float)_chunk_size);
     int chunk_idx_y = floor(y / (float)_chunk_size);
 
     uint64_t chunk_idx = (uint64_t)chunk_idx_x << 32 | (uint32_t)chunk_idx_y;
 
-    auto chunk = _chunks_pointer->find(chunk_idx);
+    auto chunk = _chunks[!_buffer_idx].find(chunk_idx);
 
-    if (chunk == _chunks_pointer->end()) {
-        auto pixels = (*_chunks_pointer)[chunk_idx].pixels;
-        auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx].pixels;
+    if (chunk == _chunks[!_buffer_idx].end()) {
+        auto pixels = _chunks[!_buffer_idx][chunk_idx].pixels;
+
         for (int i = 0; i < _chunk_size * _chunk_size * 4; i += 4) {
-            pixels[i] = _background_color.r;
-            pixels[i + 1] = _background_color.g;
-            pixels[i + 2] = _background_color.b;
-            pixels[i + 3] = 255;
-
             pixels[i] = _background_color.r;
             pixels[i + 1] = _background_color.g;
             pixels[i + 2] = _background_color.b;
@@ -174,17 +166,76 @@ void Grid::drawCell(int x, int y, sf::Color color) {
 
     int pixel_idx = (pixel_y * _chunk_size + pixel_x) * 4;
 
-    auto pixels = (*_chunks_pointer)[chunk_idx].pixels;
-    auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx].pixels;
-
+    auto pixels = _chunks[!_buffer_idx][chunk_idx].pixels;
     pixels[pixel_idx] = color.r;
     pixels[pixel_idx + 1] = color.g;
     pixels[pixel_idx + 2] = color.b;
     pixels[pixel_idx + 3] = 255;
-    pixels_buffer[pixel_idx] = color.r;
-    pixels_buffer[pixel_idx + 1] = color.g;
-    pixels_buffer[pixel_idx + 2] = color.b;
-    pixels_buffer[pixel_idx + 3] = 255;
+
+    if (chunk_idx_x < _old_chunk_render_left
+            || chunk_idx_x >= _old_chunk_render_right
+            || chunk_idx_y < _old_chunk_render_top
+            || chunk_idx_y >= _old_chunk_render_bottom)
+        return;
+
+
+    float blit_x = (x % _grid_texture_width) + 0.5;
+    if (blit_x < 0) blit_x += _grid_texture_width;
+
+    float blit_y = (y % _grid_texture_height) + 0.5;
+    if (blit_y < 0) blit_y += _grid_texture_height;
+
+    ADD_VERTEX(blit_x, blit_y, color);
+}
+
+void Grid::drawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g) {
+    drawCell(x, y, sf::Color{r, g, b});
+}
+
+void Grid::drawCell(int x, int y, sf::Color color) {
+    int chunk_idx_x = floor(x / (float)_chunk_size);
+    int chunk_idx_y = floor(y / (float)_chunk_size);
+
+    uint64_t chunk_idx = (uint64_t)chunk_idx_x << 32 | (uint32_t)chunk_idx_y;
+
+    auto chunk = _chunks[0].find(chunk_idx);
+
+    if (chunk == _chunks[0].end()) {
+        auto pixels = _chunks[0][chunk_idx].pixels;
+        auto buffer_pixels = _chunks[1][chunk_idx].pixels;
+
+        for (int i = 0; i < _chunk_size * _chunk_size * 4; i += 4) {
+            pixels[i] = _background_color.r;
+            pixels[i + 1] = _background_color.g;
+            pixels[i + 2] = _background_color.b;
+            pixels[i + 3] = 255;
+
+            buffer_pixels[i] = _background_color.r;
+            buffer_pixels[i + 1] = _background_color.g;
+            buffer_pixels[i + 2] = _background_color.b;
+            buffer_pixels[i + 3] = 255;
+        }
+    }
+
+    int pixel_y = y % _chunk_size;
+    if (pixel_y < 0) pixel_y += _chunk_size;
+
+    int pixel_x = x % _chunk_size;
+    if (pixel_x < 0) pixel_x += _chunk_size;
+
+    int pixel_idx = (pixel_y * _chunk_size + pixel_x) * 4;
+
+    auto pixels = _chunks[0][chunk_idx].pixels;
+    pixels[pixel_idx] = color.r;
+    pixels[pixel_idx + 1] = color.g;
+    pixels[pixel_idx + 2] = color.b;
+    pixels[pixel_idx + 3] = 255;
+
+    auto buffer_pixels = _chunks[1][chunk_idx].pixels;
+    buffer_pixels[pixel_idx] = color.r;
+    buffer_pixels[pixel_idx + 1] = color.g;
+    buffer_pixels[pixel_idx + 2] = color.b;
+    buffer_pixels[pixel_idx + 3] = 255;
 
     if (chunk_idx_x < _chunk_render_left
             || chunk_idx_x >= _chunk_render_right
@@ -222,121 +273,27 @@ void Grid::addText(int x, int y, std::string text, sf::Color color, int style) {
 
         uint64_t chunk_idx = (uint64_t)chunk_idx_x << 32 | (uint32_t)chunk_idx_y;
 
-        auto chunk = _chunks_pointer->find(chunk_idx);
+        auto chunk = _chunks[0].find(chunk_idx);
 
-        if (chunk == _chunks_pointer->end()) {
-            auto pixels = (*_chunks_pointer)[chunk_idx].pixels;
-            auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx].pixels;
+        if (chunk == _chunks[0].end()) {
+            auto pixels = _chunks[0][chunk_idx].pixels;
+            auto buffer_pixels = _chunks[1][chunk_idx].pixels;
+
             for (int i = 0; i < _chunk_size * _chunk_size * 4; i += 4) {
                 pixels[i] = _background_color.r;
                 pixels[i + 1] = _background_color.g;
                 pixels[i + 2] = _background_color.b;
                 pixels[i + 3] = 255;
 
-                pixels[i] = _background_color.r;
-                pixels[i + 1] = _background_color.g;
-                pixels[i + 2] = _background_color.b;
-                pixels[i + 3] = 255;
+                buffer_pixels[i] = _background_color.r;
+                buffer_pixels[i + 1] = _background_color.g;
+                buffer_pixels[i + 2] = _background_color.b;
+                buffer_pixels[i + 3] = 255;
             }
         }
 
         uint64_t idx = (uint64_t)(x + i) << 32 | (uint32_t)y;
-        (*_chunks_pointer)[chunk_idx].letters[idx] = {letters[i], color, style};
-        (*_thread_chunks_pointer)[chunk_idx].letters[idx] = {letters[i], color, style};
-    }
-}
-
-void Grid::threadDrawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g) {
-    drawCell(x, y, sf::Color{r, g, b});
-}
-
-void Grid::threadDrawCell(int x, int y, sf::Color color) {
-    _cell_draw_queue.push_back({x, y, color});
-
-    int chunk_idx_x = floor(x / (float)_chunk_size);
-    int chunk_idx_y = floor(y / (float)_chunk_size);
-
-    uint64_t chunk_idx = (uint64_t)chunk_idx_x << 32 | (uint32_t)chunk_idx_y;
-    auto chunk = _thread_chunks_pointer->find(chunk_idx);
-
-    if (chunk == _thread_chunks_pointer->end()) {
-        auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx].pixels;
-        for (int i = 0; i < _chunk_size * _chunk_size * 4; i += 4) {
-            pixels_buffer[i] = _background_color.r;
-            pixels_buffer[i + 1] = _background_color.g;
-            pixels_buffer[i + 2] = _background_color.b;
-            pixels_buffer[i + 3] = 255;
-        }
-    }
-
-    int pixel_y = y % _chunk_size;
-    if (pixel_y < 0) pixel_y += _chunk_size;
-
-    int pixel_x = x % _chunk_size;
-    if (pixel_x < 0) pixel_x += _chunk_size;
-
-    int pixel_idx = (pixel_y * _chunk_size + pixel_x) * 4;
-
-    auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx].pixels;
-    pixels_buffer[pixel_idx] = color.r;
-    pixels_buffer[pixel_idx + 1] = color.g;
-    pixels_buffer[pixel_idx + 2] = color.b;
-    pixels_buffer[pixel_idx + 3] = 255;
-}
-
-void Grid::copyCellDrawQueue() {
-    for (auto it: _cell_draw_queue) {
-        int chunk_idx_x = floor(it.x / (float)_chunk_size);
-        int chunk_idx_y = floor(it.y / (float)_chunk_size);
-
-        uint64_t chunk_idx = (uint64_t)chunk_idx_x << 32 | (uint32_t)chunk_idx_y;
-        auto chunk = _thread_chunks_pointer->find(chunk_idx);
-
-        if (chunk == _thread_chunks_pointer->end()) {
-            auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx].pixels;
-            for (int i = 0; i < _chunk_size * _chunk_size * 4; i += 4) {
-                pixels_buffer[i] = _background_color.r;
-                pixels_buffer[i + 1] = _background_color.g;
-                pixels_buffer[i + 2] = _background_color.b;
-                pixels_buffer[i + 3] = 255;
-            }
-        }
-
-        int pixel_y = it.y % _chunk_size;
-        if (pixel_y < 0) pixel_y += _chunk_size;
-
-        int pixel_x = it.x % _chunk_size;
-        if (pixel_x < 0) pixel_x += _chunk_size;
-
-        int pixel_idx = (pixel_y * _chunk_size + pixel_x) * 4;
-
-        auto pixels_buffer = (*_thread_chunks_pointer)[chunk_idx].pixels;
-        pixels_buffer[pixel_idx] = it.color.r;
-        pixels_buffer[pixel_idx + 1] = it.color.g;
-        pixels_buffer[pixel_idx + 2] = it.color.b;
-        pixels_buffer[pixel_idx + 3] = 255;
-    }
-    _cell_draw_queue.clear();
-}
-
-void Grid::drawCellQueue() {
-    for (auto it: _cell_draw_queue) {
-
-        int chunk_idx_x = floor(it.x / (float)_chunk_size);
-        int chunk_idx_y = floor(it.y / (float)_chunk_size);
-
-        if (chunk_idx_x < _chunk_render_left
-                || chunk_idx_x >= _chunk_render_right
-                || chunk_idx_y < _chunk_render_top
-                || chunk_idx_y >= _chunk_render_bottom)
-            return;
-
-        float blit_x = (it.x % _grid_texture_width) + 0.5;
-        if (blit_x < 0) blit_x += _grid_texture_width;
-
-        float blit_y = (it.y % _grid_texture_height) + 0.5;
-        if (blit_y < 0) blit_y += _grid_texture_height;
-
-        ADD_VERTEX(blit_x, blit_y, it.color);
+        _chunks[0][chunk_idx].letters[idx] = {letters[i], color, style};
+        _chunks[1][chunk_idx].letters[idx] = {letters[i], color, style};
     }
 }

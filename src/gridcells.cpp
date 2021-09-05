@@ -4,7 +4,7 @@
 #include <iostream>
 #include "grid.h"
 
-#define ADD_VERTEX(x, y, color) _vertex_array.append(sf::Vertex({x, y}, color))
+#define ADD_VERTEX(x, y, color) _cell_vertexes.append(sf::Vertex({x, y}, color))
 
 using std::unordered_map;
 
@@ -56,8 +56,8 @@ void Grid::renderText() {
         for (int chunk_y = _chunk_y; chunk_y <= _chunk_y + _n_chunks_height; chunk_y++) {
 
             uint64_t idx = (uint64_t)chunk_x << 32 | (uint32_t)chunk_y;
-            auto chunk = _chunks_pointer->find(idx);
-            if (chunk == _chunks_pointer->end())
+            auto chunk = _chunks[_buffer_idx].find(idx);
+            if (chunk == _chunks[_buffer_idx].end())
                 continue;
 
             for (auto it: chunk->second.letters) {
@@ -110,6 +110,7 @@ void Grid::updateChunkQueue() {
     int x, y;
     int n_left = 0;
     int n_right = 0;
+
     for (x = chunk_render_left; x < _chunk_render_left; x++) {
         n_left++;
         for (y = chunk_render_top; y < chunk_render_bottom; y++) {
@@ -154,7 +155,7 @@ void Grid::updateChunks() {
         uint64_t idx = (uint64_t)_chunk_queue[0].first << 32 | (uint32_t)_chunk_queue[0].second;
         //uint64_t chunk_idx = uint64_t(x / _chunk_size) << 32 | uint32_t(y / _chunk_size);
 
-        auto chunk = _chunks_pointer->find(idx);
+        auto chunk = _chunks[_buffer_idx].find(idx);
 
         int blit_x = (_chunk_queue[0].first * _chunk_size) % _grid_texture_width;
         if (blit_x < 0) blit_x += _grid_texture_width;
@@ -162,7 +163,7 @@ void Grid::updateChunks() {
         int blit_y = (_chunk_queue[0].second * _chunk_size) % _grid_texture_height;
         if (blit_y < 0) blit_y += _grid_texture_height;
 
-        if (chunk == _chunks_pointer->end()) {
+        if (chunk == _chunks[_buffer_idx].end()) {
             rectangle.setPosition({(float)blit_x, (float)blit_y});
             _grid_render_texture.draw(rectangle);
         }

@@ -93,10 +93,6 @@ void Grid::onKeyPress(int key_code) {
 }
 
 void Grid::onWindowClose() {
-    if (_thread_state) {
-        _kill_thread = true;
-        _thread.join();
-    }
-
+    endThread();
     _window.close();
 }

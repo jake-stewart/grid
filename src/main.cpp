@@ -1,27 +1,22 @@
 #include "grid.h"
-#include <unordered_set>
 #include <iostream>
-#include <unordered_map>
+#include "robin_hood.h"
 #include <vector>
 
 
 // yes i know this needs to be cleaned up
 
 
-std::vector<std::pair<int, int>> change_list;
-std::unordered_set<uint64_t> alive_cells;
-std::unordered_set<uint64_t> cells_to_add;
-std::unordered_set<uint64_t> cells_to_delete;
-std::unordered_map<uint64_t, int> neighbours;
+robin_hood::unordered_set<uint64_t> alive_cells;
+std::vector<uint64_t> cells_to_add;
+std::vector<uint64_t> cells_to_delete;
+robin_hood::unordered_map<uint64_t, int> neighbours;
 
 bool paused = true;
 bool left_mouse_pressed = false;
 bool right_mouse_pressed = false;
 
-int iterations_per_tick = 1;
-float speeds[5]     = {1, 0.25, 0.05, 0.01, 0.0};
-float iterations[5] = {1,   1,     1,    1,   3};
-
+float speeds[5] = {1, 0.25, 0.05, 0.01, 0.001};
 
 void Grid::onKeyPressEvent(int key_code) {
     switch (key_code) {
@@ -42,7 +37,6 @@ void Grid::onKeyPressEvent(int key_code) {
         case sf::Keyboard::Num4:
         case sf::Keyboard::Num5:
             int speed_idx = key_code - sf::Keyboard::Num1;
-            iterations_per_tick = iterations[speed_idx];
             setTimer(speeds[speed_idx]);
             break;
     }
@@ -51,90 +45,68 @@ void Grid::onKeyPressEvent(int key_code) {
 void Grid::onKeyReleaseEvent(int key_code) {
 }
 
-void addCell(int cell_x, int cell_y) {
-    change_list.push_back({cell_x, cell_y});
+const uint64_t DY = 0x100000000;
+const uint64_t DX = 0x1;
 
+inline void addCell(uint64_t idx) {
     // when a new cell is introduced,
     // all of the surrounding cells gain a neighbour
-    neighbours[((uint64_t)(cell_x - 1) << 32 | (uint32_t)(cell_y - 1))]++;
-    neighbours[((uint64_t)(cell_x    ) << 32 | (uint32_t)(cell_y - 1))]++;
-    neighbours[((uint64_t)(cell_x + 1) << 32 | (uint32_t)(cell_y - 1))]++;
+    neighbours[idx - DY - DX]++;
+    neighbours[idx - DY     ]++;
+    neighbours[idx - DY + DX]++;
+    neighbours[idx      - DX]++;
+    neighbours[idx      + DX]++;
+    neighbours[idx + DY - DX]++;
+    neighbours[idx + DY     ]++;
+    neighbours[idx + DY + DX]++;
 
-    neighbours[((uint64_t)(cell_x - 1) << 32 | (uint32_t)(cell_y    ))]++;
-    neighbours[((uint64_t)(cell_x + 1) << 32 | (uint32_t)(cell_y    ))]++;
-
-    neighbours[((uint64_t)(cell_x - 1) << 32 | (uint32_t)(cell_y + 1))]++;
-    neighbours[((uint64_t)(cell_x    ) << 32 | (uint32_t)(cell_y + 1))]++;
-    neighbours[((uint64_t)(cell_x + 1) << 32 | (uint32_t)(cell_y + 1))]++;
+    alive_cells.insert(idx);
 }
 
-void deleteCell(int cell_x, int cell_y) {
-    change_list.push_back({cell_x, cell_y});
-
+inline void deleteCell(uint64_t idx) {
     // when a cell is removed,
     // all of the surrounding cells lose a neighbour
-    neighbours[((uint64_t)(cell_x - 1) << 32 | (uint32_t)(cell_y - 1))]--;
-    neighbours[((uint64_t)(cell_x    ) << 32 | (uint32_t)(cell_y - 1))]--;
-    neighbours[((uint64_t)(cell_x + 1) << 32 | (uint32_t)(cell_y - 1))]--;
-
-    neighbours[((uint64_t)(cell_x - 1) << 32 | (uint32_t)(cell_y    ))]--;
-    neighbours[((uint64_t)(cell_x + 1) << 32 | (uint32_t)(cell_y    ))]--;
-
-    neighbours[((uint64_t)(cell_x - 1) << 32 | (uint32_t)(cell_y + 1))]--;
-    neighbours[((uint64_t)(cell_x    ) << 32 | (uint32_t)(cell_y + 1))]--;
-    neighbours[((uint64_t)(cell_x + 1) << 32 | (uint32_t)(cell_y + 1))]--;
+    if (!neighbours[idx - DY - DX]--) neighbours.erase(idx - DY - DX);
+    if (!neighbours[idx - DY     ]--) neighbours.erase(idx - DY     );
+    if (!neighbours[idx - DY + DX]--) neighbours.erase(idx - DY + DX);
+    if (!neighbours[idx      - DX]--) neighbours.erase(idx      - DX);
+    if (!neighbours[idx      + DX]--) neighbours.erase(idx      + DX);
+    if (!neighbours[idx + DY - DX]--) neighbours.erase(idx + DY - DX);
+    if (!neighbours[idx + DY     ]--) neighbours.erase(idx + DY     );
+    if (!neighbours[idx + DY + DX]--) neighbours.erase(idx + DY + DX);
+    alive_cells.erase(idx);
 }
 
-void doIteration() {
-    cells_to_delete.clear();
-    cells_to_add.clear();
-
-    for (auto it: change_list) {
-        int cell_x = it.first;
-        int cell_y = it.second;
-        for (int x = cell_x - 1; x < cell_x + 2; x++) {
-            for (int y = cell_y - 1; y < cell_y + 2; y++) {
-                uint64_t idx = (uint64_t)x << 32 | (uint32_t)y;
-
-                // alive cell without 2 or 3 neighbours = die
-                if (alive_cells.find(idx) != alive_cells.end()) {
-                    int n_neighbours = neighbours[idx];
-                    if (n_neighbours < 2 || n_neighbours > 3)
-                        cells_to_delete.insert(idx);
-                }
-
-                // dead cell with 3 neighbours = born
-                else if (neighbours[idx] == 3)
-                    cells_to_add.insert(idx);
-            }
-        }
-    }
-}
-
-void Grid::onTimerEvent() {
+void Grid::onTimerEvent(int n_iterations) {
     if (paused) return;
 
-    for (int i = 0; i < iterations_per_tick; i++) {
+    for (int i = 0; i < n_iterations; i++) {
         cells_to_add.clear();
         cells_to_delete.clear();
-        doIteration();
-        change_list.clear();
+
+        for (auto it: alive_cells) {
+            auto n = neighbours.find(it);
+            if (n == neighbours.end() || n->second < 2 || n->second > 3)
+                cells_to_delete.push_back(it);
+        }
+
+        for (auto it: neighbours) {
+            if (it.second == 3 && alive_cells.find(it.first) == alive_cells.end())
+                cells_to_add.push_back(it.first);
+        }
 
         for (auto it: cells_to_add) {
-            int x = it >> 32;
-            int y = it;
-            alive_cells.insert(it);
-            addCell(x, y);
-            threadDrawCell(x, y, _foreground_color);
+            addCell(it);
+            threadDrawCell(it >> 32, it, _foreground_color);
         }
 
         for (auto it: cells_to_delete) {
-            int x = it >> 32;
-            int y = it;
-            alive_cells.erase(it);
-            deleteCell(x, y);
-            threadDrawCell(x, y, _background_color);
+            deleteCell(it);
+            threadDrawCell(it >> 32, it, _background_color);
         }
+
+        if (_timer.getElapsedTime().asSeconds() > _frame_duration * 3)
+            break;
     }
 }
 
@@ -146,14 +118,14 @@ void Grid::onMouseDragEvent(int x, int y) {
 
     if (left_mouse_pressed) {
         if (!alive) {
-            addCell(x, y);
+            addCell(idx);
             alive_cells.insert(idx);
             drawCell(x, y, _foreground_color, 0.1);
         }
     }
     else if (right_mouse_pressed) {
         if (alive) {
-            deleteCell(x, y);
+            deleteCell(idx);
             alive_cells.erase(idx);
             drawCell(x, y, _background_color, 0.1);
         }
@@ -167,7 +139,7 @@ void Grid::onMousePressEvent(int x, int y, int button) {
     if (button == sf::Mouse::Left) {
         left_mouse_pressed = true;
         if (paused && !alive) {
-            addCell(x, y);
+            addCell(idx);
             alive_cells.insert(idx);
             drawCell(x, y, _foreground_color, 0.1);
         }
@@ -176,7 +148,7 @@ void Grid::onMousePressEvent(int x, int y, int button) {
     else if (button == sf::Mouse::Right) {
         right_mouse_pressed = true;
         if (paused && alive) {
-            deleteCell(x, y);
+            deleteCell(idx);
             alive_cells.erase(idx);
             drawCell(x, y, _background_color, 0.1);
         }
@@ -195,8 +167,13 @@ void Grid::onStartEvent() {
     addText(1,  0, "THIS IS A TEST", _foreground_color, 0);
     addText(1,  1, "YO YO", sf::Color::Red, sf::Text::Italic);
 
-    int speed_idx = 1;
-    iterations_per_tick = iterations[speed_idx];
+    // for (int i = 0; i < 1000; i++) {
+    //     uint64_t idx = (uint64_t)i << 32;
+    //     drawCell(i, 0, _foreground_color);
+    //     addCell(idx);
+    // }
+
+    int speed_idx = 2;
     setTimer(speeds[speed_idx]);
 }
 

@@ -2,23 +2,10 @@
 #include <iostream>
 #include "grid.h"
 
-void Grid::recordMousePos() {
-    // TODO: clean + comments
-    _mouse_timer.restart();
-    _mouse_x_positions[_mouse_pos_idx] = _mouse_x;
-    _mouse_y_positions[_mouse_pos_idx] = _mouse_y;
-    _mouse_pos_idx = (_mouse_pos_idx + 1) % _n_mouse_positions;
-}
-
 void Grid::onMouseMotion(int x, int y) {
-    if (_pan_button_pressed)
-        pan((_mouse_x - x) / _scale,
-            (_mouse_y - y) / _scale);
-    else
-        _mouse_moved = true;
-
-    _mouse_x = x;
-    _mouse_y = y;
+    _mouse_moved = true;
+    _new_mouse_x = x;
+    _new_mouse_y = y;
 }
 
 void Grid::calculateTraversedCells() {
@@ -106,24 +93,16 @@ void Grid::onPanButtonPress() {
     // busy panning, it slows down quickly
     _pan_friction = _strong_pan_friction;
 
-    // clear old mouse positions
-    _mouse_pos_idx = 0;
-    for (int i = 0; i < _n_mouse_positions; i++) {
-        _mouse_x_positions[i] = _mouse_x;
-        _mouse_y_positions[i] = _mouse_y;
-    }
-}
+    _mouse_vel_x = 0;
+    _mouse_vel_y = 0;
+
+};
 
 void Grid::onPanButtonRelease() {
     _pan_button_pressed = false;
-
-    // set pan friction back to normal
     _pan_friction = _weak_pan_friction;
-
-    // calculate the velocity
-    int idx = (_mouse_pos_idx + 1) % _n_mouse_positions;
-    _pan_vel_x = (_mouse_x_positions[idx] - _mouse_x) / (_t_per_mouse_pos * _n_mouse_positions);
-    _pan_vel_y = (_mouse_y_positions[idx] - _mouse_y) / (_t_per_mouse_pos * _n_mouse_positions);
+    _pan_vel_x = (_mouse_vel_x * _pan_speed) / _scale;
+    _pan_vel_y = (_mouse_vel_y * _pan_speed) / _scale;
 }
 
 void Grid::onMouseRelease(int button) {
@@ -133,10 +112,32 @@ void Grid::onMouseRelease(int button) {
         onMouseReleaseEvent(_mouse_cell_x, _mouse_cell_y, button);
 }
 
+void Grid::applyPanVel(float delta_time) {
+    if (!_pan_vel_x && !_pan_vel_y)
+        return;
+
+    pan(_pan_vel_x * delta_time,
+        _pan_vel_y * delta_time);
+
+    _pan_vel_x -= _pan_vel_x * _pan_friction * delta_time;
+    _pan_vel_y -= _pan_vel_y * _pan_friction * delta_time;
+
+    if (abs(_pan_vel_x) < _min_pan_vel && abs(_pan_vel_y) < _min_pan_vel) {
+        _pan_vel_x = 0;
+        _pan_vel_y = 0;
+    }
+    _mouse_moved = true;
+}
+
+
 void Grid::onMouseScroll(int wheel, float delta) {
     if (wheel == sf::Mouse::VerticalWheel) {
         _zoom_x = _mouse_x;
         _zoom_y = _mouse_y;
         _zoom_vel += delta * _zoom_speed;
+        //if (_zoom_vel < -_max_zoom_vel)
+        //    _zoom_vel = -_max_zoom_vel;
+        //else if (_zoom_vel > _max_zoom_vel)
+        //    _zoom_vel = _max_zoom_vel;
     }
 }
