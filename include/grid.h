@@ -2,13 +2,25 @@
 #define GRID_H
 
 #include <SFML/Graphics.hpp>
-#include <unordered_map>
 #include <vector>
 #include <string>
+#include "robin_hood.h"
 #include <thread>
+#include <mutex>
+#include <condition_variable>
+
 
 
 const static int _chunk_size = 256;
+
+
+enum ThreadState {
+    inactive,
+    active,
+    swapping,
+    swapped,
+    joining
+};
 
 struct QueuedCell
 {
@@ -46,7 +58,7 @@ struct Coord
 struct Chunk
 {
     sf::Uint8 pixels [_chunk_size * _chunk_size * 4];
-    std::unordered_map<uint64_t, Letter> letters;
+    robin_hood::unordered_map<uint64_t, Letter> letters;
 };
 
 // The specialized hash function for `unordered_map` keys
@@ -101,17 +113,10 @@ private:
     float _grid_fade_duration;
 
     std::thread _thread;
+    std::mutex _mutex;
+    std::condition_variable _cv;
+    ThreadState _thread_state = inactive;
 
-    int _THREAD_INACTIVE = 0;
-    int _THREAD_STARTING = 1;
-    int _THREAD_STARTED = 2;
-    int _THREAD_WAITING_FOR_SWAP = 3;
-    int _THREAD_SWAPPING = 4;
-    int _THREAD_FINISHED = 5;
-    int _THREAD_WAITING_FOR_JOIN = 6;
-    int _THREAD_JOINED = 7;
-
-    int _thread_state = _THREAD_INACTIVE;
     bool _kill_thread = false;
     bool _thread_running = false;
 
@@ -119,7 +124,7 @@ private:
 
     const char * _title;
 
-    std::unordered_map<Coord, AnimatedCell, hash_fn> _animated_cells;
+    robin_hood::unordered_map<Coord, AnimatedCell, hash_fn> _animated_cells;
 
     sf::Shader _shader;
 
@@ -143,6 +148,8 @@ private:
 	  bool _screen_changed = true;
 
     // last mouse location on screen
+    int _new_mouse_x = 0;
+    int _new_mouse_y = 0;
     int _mouse_x = 0;
     int _mouse_y = 0;
 
@@ -193,20 +200,34 @@ private:
     int _zoom_y = 0;
 
     float _zoom_friction;
+    float _heavy_zoom_friction;
     float _zoom_speed;
+    float _pan_speed;
     float _min_zoom_vel;
+    float _max_zoom_vel;
 
     // when you zoom beyond the min/max cell size, the scale bounces back
     // these are the values used for the bezier curve
-    float _zoom_bounce_p0;
-    float _zoom_bounce_p1;
-    float _zoom_bounce_p2;
-    float _zoom_bounce_t;
-    float _zoom_bounce_duration;
+    float _bounce_p0;
+    float _bounce_p1;
+    float _bounce_p2;
+    float _bounce_p3;
+    float _bounce_t;
+    float _bounce_duration;
+
+    float _bounce_overshoot;
+    float _bounce_cutoff;
+    int _bounce_state = 0;
+
+    float _min_bezier_p2;
+    float _max_bezier_p2;
+    float _min_bezier_cutoff;
+    float _max_bezier_cutoff;
+
 
     // if you zoom in/out while the scale is bouncing back,
     // the bezier curve will need to be recalculated
-    bool _zoom_bounce_broken = true;
+    bool _bounce_broken = true;
 
     // cells in grid are stored in both a rows and columns map
     // this makes it more efficient when drawing entire rows and entire columns
@@ -224,7 +245,9 @@ private:
 
     sf::Texture _chunk_texture;
     sf::Sprite _chunk_sprite;
+
     int _n_frames = 0;
+    int _n_iterations = 0;
     int _render_distance;
     int _chunk_x_cell = 0;
     int _chunk_y_cell = 0;
@@ -232,10 +255,8 @@ private:
     int _chunk_y = 0;
     int _n_chunks_width = 0;
     int _n_chunks_height = 0;
-    std::unordered_map<uint64_t, Chunk> _chunks;
-    std::unordered_map<uint64_t, Chunk> _chunks_buffer;
-    std::unordered_map<uint64_t, Chunk> * _chunks_pointer = &_chunks;
-    std::unordered_map<uint64_t, Chunk> * _thread_chunks_pointer = &_chunks_buffer;
+    robin_hood::unordered_map<uint64_t, Chunk> _chunks[2];
+    bool _buffer_idx = 0;
     std::vector<std::pair<int, int>> _chunk_queue;
 
     float _frame_duration;
@@ -244,6 +265,11 @@ private:
     int _chunk_render_right = 0;
     int _chunk_render_top = 0;
     int _chunk_render_bottom = 0;
+
+    int _old_chunk_render_left = 0;
+    int _old_chunk_render_right = 0;
+    int _old_chunk_render_top = 0;
+    int _old_chunk_render_bottom = 0;
 
 
     // a pixel buffer for drawing rows/columns. these pixels are used to update the grid texture
@@ -277,29 +303,29 @@ private:
 
     // timer that keeps track of the user's timer.
     // each time this timer ticks, onTimer() is called
-    sf::Clock _clock, _timer;
+    sf::Clock _clock, _timer, _fps_clock;
     float _timer_interval;
+    bool _lagging = false;
     bool _timer_active = false;
+    bool _thread_active;
 
     sf::Clock _mouse_timer;
+    float _mouse_dt;
+
+    float _mouse_vel_x = 0;
+    float _mouse_vel_y = 0;
+
     float _t_per_mouse_pos;
     static const int _n_mouse_positions = 4;
     int _mouse_x_positions [_n_mouse_positions];
     int _mouse_y_positions [_n_mouse_positions];
     int _mouse_pos_idx = 0;
 
-    // grid texture stored on graphics card for quicker rendering
     sf::RenderTexture _grid_render_texture;
-
-    sf::VertexArray _vertex_array;
-
-    // sprites simply wrap textures and are used for rendering instead
-    // of using the textures themselves.
     sf::Sprite _grid_sprite;
 
-
-    void randomCircle(float center_x, float center_y, float radius, float density);
-
+    sf::VertexArray _cell_vertexes;
+    sf::VertexArray _gridline_vertexes;
 
 
     int initialize();
@@ -329,8 +355,8 @@ private:
     // zoom.cpp
     void zoom(float factor, int x, int y);
     void applyZoomVel(float delta_time);
-    void createZoomBounce();
-    void applyZoomBounce(float delta_time);
+    void bounceIn(float delta_time);
+    void bounceOut(float delta_time);
 
     // timer.cpp
     void startTimer();
@@ -340,6 +366,7 @@ private:
     void endThread();
     void startThread();
     void threadFunc();
+    void threadWait(ThreadState target_state);
 
     // pan.cpp
     void pan(float x, float y);
@@ -366,7 +393,7 @@ private:
     void onKeyPressEvent(int key_code);
     void onKeyReleaseEvent(int key_code);
     void onStartEvent();
-    void onTimerEvent();
+    void onTimerEvent(int n_iterations);
 };
 
 #endif
