@@ -35,11 +35,17 @@ void Grid::render() {
 
 void Grid::renderText() {
     int character_size;
-    if (_scale < 5) character_size = 5;
-    else if (_scale < 11) character_size = 11;
+	int alpha = 255;
+
+	if (_scale < 5) return;
+	else if (_scale < 9) {
+		alpha = ((_scale - 5) / (9 - 5)) * 255;
+		//if (alpha < 0 || alpha > 255) alpha = 255;
+		character_size = 9;
+	}
     else if (_scale < 15) character_size = 15;
-    else if (_scale < 20) character_size = 20;
-    else if (_scale < 45) character_size = 45;
+    else if (_scale < 22) character_size = 22;
+    else if (_scale < 47) character_size = 47;
     else if (_scale < 75) character_size = 75;
     else if (_scale < 160) character_size = 160;
     else character_size = 300;
@@ -68,6 +74,7 @@ void Grid::renderText() {
                 float blit_y = (y - (_chunk_y * _chunk_size + _cam_y_decimal) - 0.125) * _scale;
 
                 text.setString(it.second.letter);
+				it.second.color.a = alpha;
                 text.setFillColor(it.second.color);
                 text.setStyle(it.second.style);
                 text.setPosition(blit_x, blit_y);
@@ -145,7 +152,7 @@ void Grid::updateChunkQueue() {
 
 void Grid::updateChunks() {
     sf::RectangleShape rectangle;
-    rectangle.setSize({_chunk_size, _chunk_size});
+    rectangle.setSize({(int)_chunk_size, (int)_chunk_size});
     rectangle.setFillColor(_background_color);
 
     if (!_chunk_queue.size())
