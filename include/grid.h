@@ -85,6 +85,7 @@ public:
     // interface.cpp
     Grid(const char * title, int n_cols, int n_rows, float scale);
     int start();
+	void setFPS(int fps);
     void drawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g);
     void drawCell(int x, int y, sf::Color color);
 
@@ -145,7 +146,7 @@ private:
     int _mouse_cell_x = 0;
     int _mouse_cell_y = 0;
 
-	  bool _screen_changed = true;
+    bool _screen_changed = true;
 
     // last mouse location on screen
     int _new_mouse_x = 0;
@@ -153,13 +154,10 @@ private:
     int _mouse_x = 0;
     int _mouse_y = 0;
 
-    // visible row geometry
-    int _n_visible_rows = 0;
-    int _n_visible_cols = 0;
     int _screen_width;
     int _screen_height;
 
-    int _max_fps;
+	float _frame_duration;
 
     // screen's top left corner coordinates of grid
     int _cam_x = 0;
@@ -187,13 +185,12 @@ private:
 
     bool _grid_moved;
 
-    // how zoomed in grid is. eg. scale 1.5 means each cell is 1.5 pixels.
-    // min and max scale determine cell size limits. cell size < 1 is possible but
-    // causes jitteriness when panning (also very computationally expensive because
-    // of how many cells have to be drawn)
     float _scale;
     float _max_scale;
     float _min_scale;
+    float _min_scale_cap;
+	float _decelerate_out_space;
+	float _decelerate_in_space;
 
     float _zoom_vel = 0;
     int _zoom_x = 0;
@@ -206,41 +203,8 @@ private:
     float _min_zoom_vel;
     float _max_zoom_vel;
 
-    // when you zoom beyond the min/max cell size, the scale bounces back
-    // these are the values used for the bezier curve
-    float _bounce_p0;
-    float _bounce_p1;
-    float _bounce_p2;
-    float _bounce_p3;
-    float _bounce_t;
-    float _bounce_duration;
-
-    float _bounce_overshoot;
-    float _bounce_cutoff;
-    int _bounce_state = 0;
-
-    float _min_bezier_p2;
-    float _max_bezier_p2;
-    float _min_bezier_cutoff;
-    float _max_bezier_cutoff;
-
-
-    // if you zoom in/out while the scale is bouncing back,
-    // the bezier curve will need to be recalculated
-    bool _bounce_broken = true;
-
-    // cells in grid are stored in both a rows and columns map
-    // this makes it more efficient when drawing entire rows and entire columns
-    // _rows[chunk_index][x] = {r, g, b, a}
-    // _column[chunk_index][y] = {r, g, b, a}
-    // when drawing a row or column, the chunks are iterated over, instead of individual rows.
-    // then, each cell of the chunk is iterated over. this allows for empty pixels to be ignored.
-
-    //std::unordered_map<int, std::unordered_map<int, std::unordered_map<int, sf::Color>>> _columns;
-    //std::unordered_map<int, std::unordered_map<int, std::unordered_map<int, sf::Color>>> _rows;
     void updateChunkQueue();
     void updateChunks();
-    void copyCellDrawQueue();
     void drawScreen();
 
     sf::Texture _chunk_texture;
@@ -259,8 +223,6 @@ private:
     bool _buffer_idx = 0;
     std::vector<std::pair<int, int>> _chunk_queue;
 
-    float _frame_duration;
-
     int _chunk_render_left = 0;
     int _chunk_render_right = 0;
     int _chunk_render_top = 0;
@@ -270,7 +232,6 @@ private:
     int _old_chunk_render_right = 0;
     int _old_chunk_render_top = 0;
     int _old_chunk_render_bottom = 0;
-
 
     // a pixel buffer for drawing rows/columns. these pixels are used to update the grid texture
     // the grid texture is located in graphics memory, so the pixels should not be edited directly,
@@ -311,22 +272,14 @@ private:
 
     sf::Clock _mouse_timer;
     float _mouse_dt;
-
     float _mouse_vel_x = 0;
     float _mouse_vel_y = 0;
-
-    float _t_per_mouse_pos;
-    static const int _n_mouse_positions = 4;
-    int _mouse_x_positions [_n_mouse_positions];
-    int _mouse_y_positions [_n_mouse_positions];
-    int _mouse_pos_idx = 0;
 
     sf::RenderTexture _grid_render_texture;
     sf::Sprite _grid_sprite;
 
     sf::VertexArray _cell_vertexes;
     sf::VertexArray _gridline_vertexes;
-
 
     int initialize();
     void mainloop();
@@ -355,8 +308,8 @@ private:
     // zoom.cpp
     void zoom(float factor, int x, int y);
     void applyZoomVel(float delta_time);
-    void bounceIn(float delta_time);
-    void bounceOut(float delta_time);
+    float decelerateOut(float delta_time);
+    float decelerateIn(float delta_time);
 
     // timer.cpp
     void startTimer();
@@ -366,7 +319,6 @@ private:
     void endThread();
     void startThread();
     void threadFunc();
-    void threadWait(ThreadState target_state);
 
     // pan.cpp
     void pan(float x, float y);
@@ -378,7 +330,6 @@ private:
     void onMouseRelease(int button);
     void onMouseScroll(int wheel, float delta);
     void calculateTraversedCells();
-    void recordMousePos();
     void onPanButtonPress();
     void onPanButtonRelease();
 
