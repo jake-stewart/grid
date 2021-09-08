@@ -4,14 +4,13 @@
 #include <SFML/Graphics.hpp>
 #include <vector>
 #include <string>
-#include "robin_hood.h"
+#include <unordered_map>
 #include <thread>
 #include <mutex>
 #include <condition_variable>
 
 
-
-const static int _chunk_size = 256;
+const static int CHUNK_SIZE = 256;
 
 
 enum ThreadState {
@@ -57,8 +56,8 @@ struct Coord
  
 struct Chunk
 {
-    sf::Uint8 pixels [_chunk_size * _chunk_size * 4];
-    robin_hood::unordered_map<uint64_t, Letter> letters;
+    sf::Uint8 pixels [CHUNK_SIZE * CHUNK_SIZE * 4];
+    std::unordered_map<uint64_t, Letter> letters;
 };
 
 // The specialized hash function for `unordered_map` keys
@@ -85,7 +84,7 @@ public:
     // interface.cpp
     Grid(const char * title, int n_cols, int n_rows, float scale);
     int start();
-	void setFPS(int fps);
+    void setFPS(int fps);
     void drawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g);
     void drawCell(int x, int y, sf::Color color);
 
@@ -125,14 +124,13 @@ private:
 
     const char * _title;
 
-    robin_hood::unordered_map<Coord, AnimatedCell, hash_fn> _animated_cells;
+    std::unordered_map<Coord, AnimatedCell, hash_fn> _animated_cells;
 
     sf::Shader _shader;
 
     int _max_chunk;
 
-    int _grid_texture_width;
-    int _grid_texture_height;
+    int _grid_texture_size;
     int _max_cells_x;
     int _max_cells_y;
 
@@ -157,7 +155,7 @@ private:
     int _screen_width;
     int _screen_height;
 
-	float _frame_duration;
+    float _frame_duration;
 
     // screen's top left corner coordinates of grid
     int _cam_x = 0;
@@ -189,8 +187,8 @@ private:
     float _max_scale;
     float _min_scale;
     float _min_scale_cap;
-	float _decelerate_out_space;
-	float _decelerate_in_space;
+    float _decelerate_out_space;
+    float _decelerate_in_space;
 
     float _zoom_vel = 0;
     int _zoom_x = 0;
@@ -219,7 +217,7 @@ private:
     int _chunk_y = 0;
     int _n_chunks_width = 0;
     int _n_chunks_height = 0;
-    robin_hood::unordered_map<uint64_t, Chunk> _chunks[2];
+    std::unordered_map<uint64_t, Chunk> _chunks[2];
     bool _buffer_idx = 0;
     std::vector<std::pair<int, int>> _chunk_queue;
 
