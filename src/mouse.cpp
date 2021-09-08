@@ -112,32 +112,23 @@ void Grid::onMouseRelease(int button) {
         onMouseReleaseEvent(_mouse_cell_x, _mouse_cell_y, button);
 }
 
-void Grid::applyPanVel(float delta_time) {
-    if (!_pan_vel_x && !_pan_vel_y)
-        return;
-
-    pan(_pan_vel_x * delta_time,
-        _pan_vel_y * delta_time);
-
-    _pan_vel_x -= _pan_vel_x * _pan_friction * delta_time;
-    _pan_vel_y -= _pan_vel_y * _pan_friction * delta_time;
-
-    if (abs(_pan_vel_x) < _min_pan_vel && abs(_pan_vel_y) < _min_pan_vel) {
-        _pan_vel_x = 0;
-        _pan_vel_y = 0;
-    }
-    _mouse_moved = true;
-}
-
-
 void Grid::onMouseScroll(int wheel, float delta) {
     if (wheel == sf::Mouse::VerticalWheel) {
         _zoom_x = _mouse_x;
         _zoom_y = _mouse_y;
-        _zoom_vel += delta * _zoom_speed;
-        //if (_zoom_vel < -_max_zoom_vel)
-        //    _zoom_vel = -_max_zoom_vel;
-        //else if (_zoom_vel > _max_zoom_vel)
-        //    _zoom_vel = _max_zoom_vel;
+
+		float zoom_rate = 1.0;
+		if (_scale < _min_scale * (1 + _decelerate_out_space) && delta < 0)
+			zoom_rate = decelerateOut(0);
+
+		else if (_scale > _max_scale / (1 + _decelerate_in_space) && delta > 0)
+			zoom_rate = decelerateIn(0);
+
+		_zoom_vel += delta * _zoom_speed * zoom_rate;
+
+        if (_zoom_vel < -_max_zoom_vel)
+            _zoom_vel = -_max_zoom_vel;
+        else if (_zoom_vel > _max_zoom_vel)
+            _zoom_vel = _max_zoom_vel;
     }
 }

@@ -27,105 +27,45 @@ void Grid::applyZoomVel(float delta_time) {
         _zoom_y = _mouse_y;
     }
 
-    if (_scale < _min_scale && _zoom_vel <= 0)
-        bounceIn(delta_time);
 
-    else if (_scale > _max_scale && _zoom_vel >= 0)
-        bounceOut(delta_time);
-
-    else if (_zoom_vel) {
+	if (_zoom_vel) {
         _zoom_vel = _zoom_vel * pow(1 - _zoom_friction, delta_time);
 
-        float zoom_factor = 1.0 + _zoom_vel * delta_time;
-        zoom(zoom_factor, _zoom_x, _zoom_y);
+		float zoom_rate = 1.0;
+
+		if (_scale < _min_scale * (1 + _decelerate_out_space) && _zoom_vel < 0)
+			zoom_rate = decelerateOut(delta_time);
+
+		else if (_scale > _max_scale / (1 + _decelerate_in_space) && _zoom_vel > 0)
+			zoom_rate = decelerateIn(delta_time);
+
+        zoom(1.0 + _zoom_vel * zoom_rate * delta_time, _zoom_x, _zoom_y);
 
         if (abs(_zoom_vel) < _min_zoom_vel)
             _zoom_vel = 0;
     }
 }
-void Grid::bounceOut(float delta_time) {
-    if (_zoom_vel) {
+float Grid::decelerateOut(float delta_time) {
+	float difficulty = 1 - log10(
+		(_min_scale * (1 + _decelerate_out_space) - _min_scale) /
+		(_scale - _min_scale)
+	);
 
-        float zoom_vel = _zoom_vel * pow(1 - _zoom_friction, _bounce_duration / 2) * _bounce_duration;
-        float target_scale = _scale * (1 + zoom_vel);
+	if (isnan(difficulty) || difficulty < 0 || difficulty > 1)
+		return 0;
 
-        _bounce_p0 = _scale;
-        _bounce_p2 = (target_scale > _max_bezier_cutoff) ? _max_bezier_cutoff : target_scale;
-        _bounce_p1 = _bounce_p2 + (_bounce_p2 - _scale) / 2;
-
-        _bounce_state = 0;
-        _zoom_vel = 0;
-        _bounce_t = 0.0;
-    }
-
-    float new_scale;
-
-    _bounce_t += delta_time;
-    if (_bounce_t >= _bounce_duration) {
-        new_scale = _bounce_p2;
-        _bounce_t = 0;
-
-        if (_bounce_state == 0) {
-            _bounce_state = 1;
-            _bounce_p0 = new_scale;
-            _bounce_p1 = _max_scale;
-            _bounce_p2 = _max_scale;
-        }
-    }
-    else
-        new_scale = quadraticBezier(
-            _bounce_p0,
-            _bounce_p1,
-            _bounce_p2,
-            _bounce_t / _bounce_duration
-        );
-
-    float x_pos = _zoom_x / _scale;
-    float y_pos = _zoom_y / _scale;
-    setScale(new_scale);
-    pan(x_pos - _zoom_x / _scale,
-        y_pos - _zoom_y / _scale);
+	return difficulty;
 }
 
-void Grid::bounceIn(float delta_time) {
-    if (_zoom_vel) {
-        float zoom_vel = _zoom_vel * pow(1 - _zoom_friction, _bounce_duration / 2) * _bounce_duration;
-        float target_scale = _scale * (1 + zoom_vel);
+float Grid::decelerateIn(float delta_time) {
+	float start = _max_scale / (1 + _decelerate_in_space);
+	float difficulty = -log10(
+		(_scale - start + (_max_scale - start) / 10) /
+		(_max_scale - start)
+	);
 
-        _bounce_p0 = _scale;
-        _bounce_p1 = (target_scale < _min_bezier_cutoff) ? _min_bezier_cutoff : target_scale;
-        _bounce_p2 = _bounce_p1 + (_scale - _bounce_p1) / 2;
+	if (isnan(difficulty) || difficulty < 0 || difficulty > 1)
+		return 0;
 
-        _bounce_t = 0.0;
-        _zoom_vel = 0;
-        _bounce_state = 0;
-    }
-
-    float new_scale;
-
-    _bounce_t += delta_time;
-    if (_bounce_t >= _bounce_duration) {
-        new_scale = _bounce_p2;
-        _bounce_t = 0;
-
-        if (_bounce_state == 0) {
-            _bounce_state = 1;
-            _bounce_p0 = new_scale;
-            _bounce_p1 = _min_scale;
-            _bounce_p2 = _min_scale;
-        }
-    }
-    else
-        new_scale = quadraticBezier(
-            _bounce_p0,
-            _bounce_p1,
-            _bounce_p2,
-            _bounce_t / _bounce_duration
-        );
-
-    float x_pos = _zoom_x / _scale;
-    float y_pos = _zoom_y / _scale;
-    setScale(new_scale);
-    pan(x_pos - _zoom_x / _scale,
-        y_pos - _zoom_y / _scale);
+	return difficulty;
 }

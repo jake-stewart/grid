@@ -22,3 +22,21 @@ void Grid::pan(float x, float y) {
 
     _grid_moved = true;
 }
+void Grid::applyPanVel(float delta_time) {
+    if (!_pan_vel_x && !_pan_vel_y)
+        return;
+
+    pan(_pan_vel_x * delta_time,
+        _pan_vel_y * delta_time);
+
+    _pan_vel_x -= _pan_vel_x * _pan_friction * delta_time;
+    _pan_vel_y -= _pan_vel_y * _pan_friction * delta_time;
+
+    if (abs(_pan_vel_x) < _min_pan_vel && abs(_pan_vel_y) < _min_pan_vel) {
+        _pan_vel_x = 0;
+        _pan_vel_y = 0;
+    }
+    _mouse_moved = true;
+}
+
+

@@ -56,23 +56,17 @@ void Grid::onResize(unsigned int new_width, unsigned int new_height) {
     _view.setCenter(new_width / 2.0, new_height / 2.0);
     _window.setView(_view);
 
-    // cell coords at middle of screen, relative to top left
-    float middle_x = _cam_x + (_screen_width / 2.0) / _scale;
-    float middle_y = _cam_y + (_screen_height / 2.0) / _scale;
-
     _screen_width = new_width;
     _screen_height = new_height;
 
-    // setScale() will increase the grid's scale if the grid texture
-    // is too small
+	float min_scale_width = _screen_width / ((_render_distance - 1) * _chunk_size);
+	float min_scale_height = _screen_height / ((_render_distance - 1) * _chunk_size);
+
+	float smallest_scale = (min_scale_width > min_scale_height) ? min_scale_width : min_scale_height;
+
+	_min_scale = (smallest_scale < _min_scale_cap) ? _min_scale_cap : smallest_scale;
+
     setScale(_scale);
-
-    // new cell coords at middle of screen, relative to top left
-    float new_middle_x = _cam_x + (_screen_width / 2.0) / _scale;
-    float new_middle_y = _cam_y + (_screen_height / 2.0) / _scale;
-
-    // make sure the old middle cell is still in the middle of the screen
-    pan(middle_x - new_middle_x, middle_y - new_middle_y);
 }
 
 void Grid::onKeyPress(int key_code) {

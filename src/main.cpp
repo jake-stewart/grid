@@ -164,8 +164,7 @@ void Grid::onMouseReleaseEvent(int x, int y, int button) {
 }
 
 void Grid::onStartEvent() {
-    addText(1,  0, "THIS IS A TEST", _foreground_color, 0);
-    addText(1,  1, "YO YO", sf::Color::Red, sf::Text::Italic);
+    addText(8,  9, "GRID", _foreground_color, 0);
 
     // for (int i = 0; i < 1000; i++) {
     //     uint64_t idx = (uint64_t)i << 32;
@@ -178,7 +177,7 @@ void Grid::onStartEvent() {
 }
 
 int main() {
-    Grid grid("Grid", 20, 20, 40);
+    Grid grid("Grid", 20, 19, 40);
     // grid.setGridThickness(6);
     // grid.useAntialiasing(false);
     // grid.setGridlinesFade(0, 0);

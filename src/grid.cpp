@@ -45,8 +45,6 @@ const char * shader_source =
     "}";
 
 Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
-    //_cam_x = 2147483648;
-    //_cam_y = 2147483648;
     _cam_x = 0;
     _cam_y = 0;
 
@@ -56,11 +54,6 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
 
     _mouse_cell_x = _cam_x;
     _mouse_cell_y = _cam_y;
-
-    _col_start = _cam_x;
-    _row_start = _cam_y;
-    _col_end = _cam_x;
-    _row_end = _cam_y;
 
     _grid_fading = 0;
     _grid_fade_duration = 0.15;
@@ -73,11 +66,6 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
     _display_grid = true;
     _timer_interval = 1;
 
-    _t_per_mouse_pos = 0.01;
-
-    _max_fps = 144;
-    _frame_duration = 1.0 / _max_fps;
-
     _pan_button = sf::Mouse::Middle;
     _min_pan_vel = 0.01;
     _weak_pan_friction = 5;
@@ -86,23 +74,21 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
     _scale = scale;
     _max_scale = 300;
     _min_scale = 2;
+    _min_scale_cap = 2;
 
-    _zoom_friction = 0.998;
+    _zoom_friction = 0.995;
     _zoom_speed = 1;
     _pan_speed = 0.8;
     _min_zoom_vel = 0.01;
-    _max_zoom_vel = 100.0;
+    _max_zoom_vel = 10.0;
 
-    _bounce_duration = 0.2;
-
-    _bounce_cutoff = 0.5;
-    _min_bezier_cutoff = _min_scale - _min_scale * _bounce_cutoff;
-    _max_bezier_cutoff = _max_scale + _max_scale * _bounce_cutoff;
+	_decelerate_out_space = 1.0;
+	_decelerate_in_space = 0.4;
 
     // default
-    _foreground_color = sf::Color{0x54, 0x5d, 0x66};
-    _background_color = sf::Color{0xd0, 0xd5, 0xde};
-    _gridline_color   = sf::Color{0x75, 0x83, 0x8e};
+    //_foreground_color = sf::Color{0x54, 0x5d, 0x66};
+    //_background_color = sf::Color{0xd0, 0xd5, 0xde};
+    //_gridline_color   = sf::Color{0x75, 0x83, 0x8e};
 
     // solarized
     //_foreground_color = sf::Color{0xEE, 0xE8, 0xD5};
@@ -120,9 +106,9 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
     //_gridline_color   = sf::Color{0x45, 0x41, 0x3D};
 
     // one dark
-    //_foreground_color = sf::Color{0xAB, 0xB2, 0xBF};
-    //_background_color = sf::Color{0x28, 0x2C, 0x34};
-    //_gridline_color   = sf::Color{0x38, 0x3C, 0x46};
+    _foreground_color = sf::Color{0xAB, 0xB2, 0xBF};
+    _background_color = sf::Color{0x28, 0x2C, 0x34};
+    _gridline_color   = sf::Color{0x38, 0x3C, 0x46};
 
     // boring light
     // _foreground_color = sf::Color{0x00, 0x00, 0x00};
@@ -148,7 +134,7 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
 
 int Grid::initialize() {
     _window.create(sf::VideoMode(_screen_width, _screen_height), _title);
-    _window.setFramerateLimit(_max_fps);
+	setFPS(150);
 
     _view = _window.getDefaultView();
 
@@ -299,12 +285,12 @@ void Grid::mainloop() {
         incrementTimer();
 
         _window.display();
-        // if (_fps_clock.getElapsedTime().asSeconds() >= 1) {
-        //     std::cout << _n_frames << ", " << _n_iterations << std::endl;
-        //     _n_frames = 0;
-        //     _n_iterations = 0;
-        //     _fps_clock.restart();
-        // }
+        if (_fps_clock.getElapsedTime().asSeconds() >= 1) {
+            std::cout << "FPS: " << _n_frames << std::endl;
+            _n_frames = 0;
+            _n_iterations = 0;
+            _fps_clock.restart();
+        }
 
     }
 }

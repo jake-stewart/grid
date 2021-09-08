@@ -6,26 +6,12 @@
 #define ADD_VERTEX(x, y, color) _cell_vertexes.append(sf::Vertex({x, y}, color))
 
 void Grid::setScale(float scale) {
-    // calculate how many cells would be visible at the new scale
-    float n_cells_x = _screen_width / scale;
-    float n_cells_y = _screen_height / scale;
-
-    int n = (_render_distance - 1) * _chunk_size;
-    // if grid texture is not large enough to support this many cells at this scale
-    if (n_cells_x > n || n_cells_y > n) {
-        float min_scale_x = (float)_screen_width / n;
-        float min_scale_y = (float)_screen_height / n;
-
-        // then set the scale to be as small as possible
-        // and stop zooming, since there is no point continuing to zoom out
-        _scale = (min_scale_x > min_scale_y) ? min_scale_x : min_scale_y;
-        _zoom_vel = 0;
-    }
-    else {
-        // otherwise, set the scale to the desired value
+	if (scale > _max_scale)
+		_scale = _max_scale;
+	else if (scale < _min_scale)
+		_scale = _min_scale;
+    else
         _scale = scale;
-    }
-
     applyGridEffects();
 }
 
@@ -109,6 +95,11 @@ int Grid::start() {
     onStartEvent();
     mainloop();
     return 0;
+}
+
+void Grid::setFPS(int fps) {
+	if (fps) _frame_duration = 1 / fps;
+	_window.setFramerateLimit(fps);
 }
 
 sf::Color Grid::getCell(int x, int y) {
