@@ -14,18 +14,18 @@ void Grid::render() {
     _grid_sprite.setScale(_scale, _scale);
 
     _grid_sprite.setTextureRect({
-        (_chunk_x * _chunk_size) % _grid_texture_width,
-        (_chunk_y * _chunk_size) % _grid_texture_height,
-        _render_distance * _chunk_size,
-        _render_distance * _chunk_size 
+        (_chunk_x * CHUNK_SIZE) % _grid_texture_size,
+        (_chunk_y * CHUNK_SIZE) % _grid_texture_size,
+        _render_distance * CHUNK_SIZE,
+        _render_distance * CHUNK_SIZE 
     });
 
-    _blit_x_offset = (-_chunk_size + (_chunk_size - _cam_x_decimal)) * _scale;
-    _blit_y_offset = (-_chunk_size + (_chunk_size - _cam_y_decimal)) * _scale;
+    _blit_x_offset = (-CHUNK_SIZE + (CHUNK_SIZE - _cam_x_decimal)) * _scale;
+    _blit_y_offset = (-CHUNK_SIZE + (CHUNK_SIZE - _cam_y_decimal)) * _scale;
 
     _grid_sprite.setPosition(_blit_x_offset, _blit_y_offset);
 
-    if (_antialias_enabled) {
+    if (_antialias_enabled && _scale > 1) {
         _shader.setUniform("scale", _scale);
         _window.draw(_grid_sprite, &_shader);
     }
@@ -35,20 +35,19 @@ void Grid::render() {
 
 void Grid::renderText() {
     int character_size;
-	int alpha = 255;
 
-	if (_scale < 5) return;
-	else if (_scale < 9) {
-		alpha = ((_scale - 5) / (9 - 5)) * 255;
-		//if (alpha < 0 || alpha > 255) alpha = 255;
-		character_size = 9;
-	}
-    else if (_scale < 15) character_size = 15;
+    if (_scale < 5) return;
+    else if (_scale < 7) character_size = 7;
+    else if (_scale < 13) character_size = 13;
     else if (_scale < 22) character_size = 22;
-    else if (_scale < 47) character_size = 47;
-    else if (_scale < 75) character_size = 75;
+    else if (_scale < 40) character_size = 40;
+    else if (_scale < 69) character_size = 69;
     else if (_scale < 160) character_size = 160;
     else character_size = 300;
+
+    int alpha = (_scale < 11)
+        ? alpha = ((_scale - 5) / (11 - 5)) * 255
+        : 255;
 
     float increased_scale = _scale / character_size;
 
@@ -70,11 +69,11 @@ void Grid::renderText() {
                 int x = it.first >> 32;
                 int y = (int)it.first;
 
-                float blit_x = (x - (_chunk_x * _chunk_size + _cam_x_decimal) + 0.2) * _scale;
-                float blit_y = (y - (_chunk_y * _chunk_size + _cam_y_decimal) - 0.125) * _scale;
+                float blit_x = (x - (_chunk_x * CHUNK_SIZE + _cam_x_decimal) + 0.2) * _scale;
+                float blit_y = (y - (_chunk_y * CHUNK_SIZE + _cam_y_decimal) - 0.15) * _scale;
 
                 text.setString(it.second.letter);
-				it.second.color.a = alpha;
+                it.second.color.a = alpha;
                 text.setFillColor(it.second.color);
                 text.setStyle(it.second.style);
                 text.setPosition(blit_x, blit_y);
@@ -86,13 +85,13 @@ void Grid::renderText() {
 }
 
 void Grid::updateChunkQueue() {
-    _n_chunks_width = ceil(_screen_width / (_chunk_size * _scale));
+    _n_chunks_width = ceil(_screen_width / (CHUNK_SIZE * _scale));
     int spare_chunks_x = _render_distance - _n_chunks_width;
     if (spare_chunks_x < 0) spare_chunks_x = 0;
     int chunk_render_left = _chunk_x - spare_chunks_x / 2;
     int chunk_render_right = chunk_render_left + _render_distance;
 
-    _n_chunks_height = ceil(_screen_height / (_chunk_size * _scale));
+    _n_chunks_height = ceil(_screen_height / (CHUNK_SIZE * _scale));
     int spare_chunks_y = _render_distance - _n_chunks_height;
     if (spare_chunks_y < 0) spare_chunks_y = 0;
     int chunk_render_top = _chunk_y - spare_chunks_y / 2;
@@ -117,6 +116,8 @@ void Grid::updateChunkQueue() {
     int x, y;
     int n_left = 0;
     int n_right = 0;
+    int n_top = 0;
+    int n_bottom = 0;
 
     for (x = chunk_render_left; x < _chunk_render_left; x++) {
         n_left++;
@@ -133,16 +134,47 @@ void Grid::updateChunkQueue() {
     }
 
     for (y = chunk_render_top; y < _chunk_render_top; y++) {
+        n_top++;
         for (x = chunk_render_left + n_left; x < chunk_render_right - n_right; x++) {
             _chunk_queue.push_back({x, y});
         }
     }
 
     for (y = _chunk_render_bottom; y < chunk_render_bottom; y++) {
+        n_bottom++;
         for (x = chunk_render_left + n_left; x < chunk_render_right - n_right; x++) {
             _chunk_queue.push_back({x, y});
         }
     }
+
+    sf::RectangleShape rectangle;
+    rectangle.setFillColor(_background_color);
+
+    float blit_x, blit_y;
+
+    blit_x = (chunk_render_left * CHUNK_SIZE) % _grid_texture_size;
+    if (blit_x < 0) blit_x += _grid_texture_size;
+    rectangle.setPosition({blit_x, 0});
+    rectangle.setSize({(float)CHUNK_SIZE * n_left, (float)_render_distance * CHUNK_SIZE});
+    _grid_render_texture.draw(rectangle);
+
+    blit_x = (_chunk_render_right * CHUNK_SIZE) % _grid_texture_size;
+    if (blit_x < 0) blit_x += _grid_texture_size;
+    rectangle.setPosition({blit_x, 0});
+    rectangle.setSize({(float)CHUNK_SIZE * n_right, (float)_render_distance * CHUNK_SIZE});
+    _grid_render_texture.draw(rectangle);
+
+    blit_y = (chunk_render_top * CHUNK_SIZE) % _grid_texture_size;
+    if (blit_y < 0) blit_y += _grid_texture_size;
+    rectangle.setPosition({0, blit_y});
+    rectangle.setSize({(float)_render_distance * CHUNK_SIZE, (float)CHUNK_SIZE * n_top});
+    _grid_render_texture.draw(rectangle);
+
+    blit_y = (_chunk_render_bottom * CHUNK_SIZE) % _grid_texture_size;
+    if (blit_y < 0) blit_y += _grid_texture_size;
+    rectangle.setPosition({0, blit_y});
+    rectangle.setSize({(float)_render_distance * CHUNK_SIZE, (float)CHUNK_SIZE * n_bottom});
+    _grid_render_texture.draw(rectangle);
 
     _chunk_render_left = chunk_render_left;
     _chunk_render_right = chunk_render_right;
@@ -151,37 +183,21 @@ void Grid::updateChunkQueue() {
 }
 
 void Grid::updateChunks() {
-    sf::RectangleShape rectangle;
-    rectangle.setSize({(int)_chunk_size, (int)_chunk_size});
-    rectangle.setFillColor(_background_color);
-
     if (!_chunk_queue.size())
         return;
 
     while (_chunk_queue.size()) {
         uint64_t idx = (uint64_t)_chunk_queue[0].first << 32 | (uint32_t)_chunk_queue[0].second;
-        //uint64_t chunk_idx = uint64_t(x / _chunk_size) << 32 | uint32_t(y / _chunk_size);
 
         auto chunk = _chunks[_buffer_idx].find(idx);
 
-        int blit_x = (_chunk_queue[0].first * _chunk_size) % _grid_texture_width;
-        if (blit_x < 0) blit_x += _grid_texture_width;
+        if (chunk != _chunks[_buffer_idx].end()) {
+            int blit_x = (_chunk_queue[0].first * CHUNK_SIZE) % _grid_texture_size;
+            if (blit_x < 0) blit_x += _grid_texture_size;
 
-        int blit_y = (_chunk_queue[0].second * _chunk_size) % _grid_texture_height;
-        if (blit_y < 0) blit_y += _grid_texture_height;
+            int blit_y = (_chunk_queue[0].second * CHUNK_SIZE) % _grid_texture_size;
+            if (blit_y < 0) blit_y += _grid_texture_size;
 
-        if (chunk == _chunks[_buffer_idx].end()) {
-            rectangle.setPosition({(float)blit_x, (float)blit_y});
-            _grid_render_texture.draw(rectangle);
-        }
-
-        else {
-            //sf::Texture tex = _grid_render_texture.getTexture();
-            //tex.update(
-            //    chunk->second,
-            //    blit_x, blit_y,
-            //    _chunk_size, _chunk_size
-            //);
             _chunk_texture.update(chunk->second.pixels);
             _chunk_sprite.setPosition(blit_x, blit_y);
             _grid_render_texture.draw(_chunk_sprite);
@@ -196,13 +212,13 @@ void Grid::updateChunks() {
 void Grid::drawScreen() {
     _chunk_queue.clear();
 
-    int n_chunks_width = ceil(_screen_width / (_chunk_size * _scale));
+    int n_chunks_width = ceil(_screen_width / (CHUNK_SIZE * _scale));
     int spare_chunks_x = _render_distance - n_chunks_width;
     if (spare_chunks_x < 0) spare_chunks_x = 0;
     int _chunk_render_left = _chunk_x - spare_chunks_x / 2;
     int _chunk_render_right = _chunk_render_left + _render_distance;
 
-    int n_chunks_height = ceil(_screen_height / (_chunk_size * _scale));
+    int n_chunks_height = ceil(_screen_height / (CHUNK_SIZE * _scale));
     int spare_chunks_y = _render_distance - n_chunks_height;
     if (spare_chunks_y < 0) spare_chunks_y = 0;
     int _chunk_render_top = _chunk_y - spare_chunks_y / 2;

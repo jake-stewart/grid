@@ -80,13 +80,13 @@ int Grid::start() {
     if (err_code != 0)
         return err_code;
 
-    int n_chunks_width = ceil(_screen_width / (_chunk_size * _scale));
+    int n_chunks_width = ceil(_screen_width / (CHUNK_SIZE * _scale));
     int spare_chunks_x = _render_distance - n_chunks_width;
     if (spare_chunks_x < 0) spare_chunks_x = 0;
     _chunk_render_left = _chunk_x - spare_chunks_x / 2;
     _chunk_render_right = _chunk_render_left + _render_distance;
 
-    int n_chunks_height = ceil(_screen_height / (_chunk_size * _scale));
+    int n_chunks_height = ceil(_screen_height / (CHUNK_SIZE * _scale));
     int spare_chunks_y = _render_distance - n_chunks_height;
     if (spare_chunks_y < 0) spare_chunks_y = 0;
     _chunk_render_top = _chunk_y - spare_chunks_y / 2;
@@ -98,13 +98,14 @@ int Grid::start() {
 }
 
 void Grid::setFPS(int fps) {
-	if (fps) _frame_duration = 1 / fps;
+	if (fps) _frame_duration = 1.0 / fps;
+  else _frame_duration = 0;
 	_window.setFramerateLimit(fps);
 }
 
 sf::Color Grid::getCell(int x, int y) {
-    int chunk_idx_x = floor(x / (float)_chunk_size);
-    int chunk_idx_y = floor(y / (float)_chunk_size);
+    int chunk_idx_x = floor(x / (float)CHUNK_SIZE);
+    int chunk_idx_y = floor(y / (float)CHUNK_SIZE);
 
     uint64_t chunk_idx = (uint64_t)chunk_idx_x << 32 | (uint32_t)chunk_idx_y;
     auto chunk = _chunks[0].find(chunk_idx);
@@ -112,13 +113,13 @@ sf::Color Grid::getCell(int x, int y) {
     if (chunk == _chunks[0].end())
         return _background_color;
 
-    int pixel_y = y % _chunk_size;
-    if (pixel_y < 0) pixel_y += _chunk_size;
+    int pixel_y = y % CHUNK_SIZE;
+    if (pixel_y < 0) pixel_y += CHUNK_SIZE;
 
-    int pixel_x = x % _chunk_size;
-    if (pixel_x < 0) pixel_x += _chunk_size;
+    int pixel_x = x % CHUNK_SIZE;
+    if (pixel_x < 0) pixel_x += CHUNK_SIZE;
 
-    int pixel_idx = (pixel_y * _chunk_size + pixel_x) * 4;
+    int pixel_idx = (pixel_y * CHUNK_SIZE + pixel_x) * 4;
 
     return sf::Color{
         chunk->second.pixels[pixel_idx],
@@ -131,8 +132,8 @@ sf::Color Grid::getCell(int x, int y) {
 void Grid::threadDrawCell(int x, int y, sf::Color color) {
     _cell_draw_queue.push_back({x, y, color});
 
-    int chunk_idx_x = floor(x / (float)_chunk_size);
-    int chunk_idx_y = floor(y / (float)_chunk_size);
+    int chunk_idx_x = floor(x / (float)CHUNK_SIZE);
+    int chunk_idx_y = floor(y / (float)CHUNK_SIZE);
 
     uint64_t chunk_idx = (uint64_t)chunk_idx_x << 32 | (uint32_t)chunk_idx_y;
 
@@ -141,7 +142,7 @@ void Grid::threadDrawCell(int x, int y, sf::Color color) {
     if (chunk == _chunks[!_buffer_idx].end()) {
         auto pixels = _chunks[!_buffer_idx][chunk_idx].pixels;
 
-        for (int i = 0; i < _chunk_size * _chunk_size * 4; i += 4) {
+        for (int i = 0; i < CHUNK_SIZE * CHUNK_SIZE * 4; i += 4) {
             pixels[i] = _background_color.r;
             pixels[i + 1] = _background_color.g;
             pixels[i + 2] = _background_color.b;
@@ -149,13 +150,13 @@ void Grid::threadDrawCell(int x, int y, sf::Color color) {
         }
     }
 
-    int pixel_y = y % _chunk_size;
-    if (pixel_y < 0) pixel_y += _chunk_size;
+    int pixel_y = y % CHUNK_SIZE;
+    if (pixel_y < 0) pixel_y += CHUNK_SIZE;
 
-    int pixel_x = x % _chunk_size;
-    if (pixel_x < 0) pixel_x += _chunk_size;
+    int pixel_x = x % CHUNK_SIZE;
+    if (pixel_x < 0) pixel_x += CHUNK_SIZE;
 
-    int pixel_idx = (pixel_y * _chunk_size + pixel_x) * 4;
+    int pixel_idx = (pixel_y * CHUNK_SIZE + pixel_x) * 4;
 
     auto pixels = _chunks[!_buffer_idx][chunk_idx].pixels;
     pixels[pixel_idx] = color.r;
@@ -170,11 +171,11 @@ void Grid::threadDrawCell(int x, int y, sf::Color color) {
         return;
 
 
-    float blit_x = (x % _grid_texture_width) + 0.5;
-    if (blit_x < 0) blit_x += _grid_texture_width;
+    float blit_x = (x % _grid_texture_size) + 0.5;
+    if (blit_x < 0) blit_x += _grid_texture_size;
 
-    float blit_y = (y % _grid_texture_height) + 0.5;
-    if (blit_y < 0) blit_y += _grid_texture_height;
+    float blit_y = (y % _grid_texture_size) + 0.5;
+    if (blit_y < 0) blit_y += _grid_texture_size;
 
     ADD_VERTEX(blit_x, blit_y, color);
 }
@@ -184,8 +185,8 @@ void Grid::drawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g) {
 }
 
 void Grid::drawCell(int x, int y, sf::Color color) {
-    int chunk_idx_x = floor(x / (float)_chunk_size);
-    int chunk_idx_y = floor(y / (float)_chunk_size);
+    int chunk_idx_x = floor(x / (float)CHUNK_SIZE);
+    int chunk_idx_y = floor(y / (float)CHUNK_SIZE);
 
     uint64_t chunk_idx = (uint64_t)chunk_idx_x << 32 | (uint32_t)chunk_idx_y;
 
@@ -195,7 +196,7 @@ void Grid::drawCell(int x, int y, sf::Color color) {
         auto pixels = _chunks[0][chunk_idx].pixels;
         auto buffer_pixels = _chunks[1][chunk_idx].pixels;
 
-        for (int i = 0; i < _chunk_size * _chunk_size * 4; i += 4) {
+        for (int i = 0; i < CHUNK_SIZE * CHUNK_SIZE * 4; i += 4) {
             pixels[i] = _background_color.r;
             pixels[i + 1] = _background_color.g;
             pixels[i + 2] = _background_color.b;
@@ -208,13 +209,13 @@ void Grid::drawCell(int x, int y, sf::Color color) {
         }
     }
 
-    int pixel_y = y % _chunk_size;
-    if (pixel_y < 0) pixel_y += _chunk_size;
+    int pixel_y = y % CHUNK_SIZE;
+    if (pixel_y < 0) pixel_y += CHUNK_SIZE;
 
-    int pixel_x = x % _chunk_size;
-    if (pixel_x < 0) pixel_x += _chunk_size;
+    int pixel_x = x % CHUNK_SIZE;
+    if (pixel_x < 0) pixel_x += CHUNK_SIZE;
 
-    int pixel_idx = (pixel_y * _chunk_size + pixel_x) * 4;
+    int pixel_idx = (pixel_y * CHUNK_SIZE + pixel_x) * 4;
 
     auto pixels = _chunks[0][chunk_idx].pixels;
     pixels[pixel_idx] = color.r;
@@ -235,11 +236,11 @@ void Grid::drawCell(int x, int y, sf::Color color) {
         return;
 
 
-    float blit_x = (x % _grid_texture_width) + 0.5;
-    if (blit_x < 0) blit_x += _grid_texture_width;
+    float blit_x = (x % _grid_texture_size) + 0.5;
+    if (blit_x < 0) blit_x += _grid_texture_size;
 
-    float blit_y = (y % _grid_texture_height) + 0.5;
-    if (blit_y < 0) blit_y += _grid_texture_height;
+    float blit_y = (y % _grid_texture_size) + 0.5;
+    if (blit_y < 0) blit_y += _grid_texture_size;
 
     ADD_VERTEX(blit_x, blit_y, color);
 }
@@ -253,14 +254,14 @@ void stripUnicode(std::string & text) {
 }
 
 void Grid::addText(int x, int y, std::string text, sf::Color color, int style) {
-    int chunk_idx_y = floor(y / (float)_chunk_size);
+    int chunk_idx_y = floor(y / (float)CHUNK_SIZE);
 
     stripUnicode(text);
     auto letters = text.c_str();
     for (int i = 0; i < text.length(); i++) {
         if (letters[i] == ' ') continue;
 
-        int chunk_idx_x = floor((x + i) / (float)_chunk_size);
+        int chunk_idx_x = floor((x + i) / (float)CHUNK_SIZE);
 
         uint64_t chunk_idx = (uint64_t)chunk_idx_x << 32 | (uint32_t)chunk_idx_y;
 
@@ -270,7 +271,7 @@ void Grid::addText(int x, int y, std::string text, sf::Color color, int style) {
             auto pixels = _chunks[0][chunk_idx].pixels;
             auto buffer_pixels = _chunks[1][chunk_idx].pixels;
 
-            for (int i = 0; i < _chunk_size * _chunk_size * 4; i += 4) {
+            for (int i = 0; i < CHUNK_SIZE * CHUNK_SIZE * 4; i += 4) {
                 pixels[i] = _background_color.r;
                 pixels[i + 1] = _background_color.g;
                 pixels[i + 2] = _background_color.b;

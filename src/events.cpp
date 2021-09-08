@@ -1,4 +1,5 @@
 #include <SFML/Graphics.hpp>
+#include <iostream>
 #include "grid.h"
 
 void Grid::handleEvents() {
@@ -59,12 +60,14 @@ void Grid::onResize(unsigned int new_width, unsigned int new_height) {
     _screen_width = new_width;
     _screen_height = new_height;
 
-	float min_scale_width = _screen_width / ((_render_distance - 1) * _chunk_size);
-	float min_scale_height = _screen_height / ((_render_distance - 1) * _chunk_size);
+    float min_scale_width = (float)_screen_width / (CHUNK_SIZE * (_render_distance - 1));
+    float min_scale_height = (float)_screen_height / (CHUNK_SIZE * (_render_distance - 1));
 
-	float smallest_scale = (min_scale_width > min_scale_height) ? min_scale_width : min_scale_height;
+    float smallest_scale = (min_scale_width > min_scale_height)
+        ? min_scale_width
+        : min_scale_height;
 
-	_min_scale = (smallest_scale < _min_scale_cap) ? _min_scale_cap : smallest_scale;
+    _min_scale = (smallest_scale < _min_scale_cap) ? _min_scale_cap : smallest_scale;
 
     setScale(_scale);
 }

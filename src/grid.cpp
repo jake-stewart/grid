@@ -60,30 +60,29 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
 
     _antialias_enabled = true;
 
-    _grid_texture_width = 2048;
-    _grid_texture_height = 2048;
+    _grid_texture_size = 2048;
 
     _display_grid = true;
     _timer_interval = 1;
 
     _pan_button = sf::Mouse::Middle;
     _min_pan_vel = 0.01;
-    _weak_pan_friction = 5;
-    _strong_pan_friction = 20;
+    _weak_pan_friction = 0.999;
+    _strong_pan_friction = 0.999999;
 
     _scale = scale;
     _max_scale = 300;
     _min_scale = 2;
-    _min_scale_cap = 2;
+    _min_scale_cap = _min_scale;
 
     _zoom_friction = 0.995;
     _zoom_speed = 1;
-    _pan_speed = 0.8;
+    _pan_speed = 1;
     _min_zoom_vel = 0.01;
     _max_zoom_vel = 10.0;
 
-	_decelerate_out_space = 1.0;
-	_decelerate_in_space = 0.4;
+    _decelerate_out_space = 1.0;
+    _decelerate_in_space = 0.4;
 
     // default
     //_foreground_color = sf::Color{0x54, 0x5d, 0x66};
@@ -133,8 +132,21 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
 }
 
 int Grid::initialize() {
+    // texture stored in graphics memory where each pixel is a cell
+    int max_size = sf::Texture::getMaximumSize();
+    if (max_size < _grid_texture_size) {
+        _grid_texture_size = max_size;
+    }
+    _render_distance = _grid_texture_size / CHUNK_SIZE;
+
+    // at least render distance of 2 is required for rendering to work
+    // since chunks are 128x128, the computer must support 256x256 textures
+    // can't imagine a computer that doesn't support 256x256 texture
+    if (_render_distance < 2)
+        return 1;
+
     _window.create(sf::VideoMode(_screen_width, _screen_height), _title);
-	setFPS(150);
+    setFPS(150);
 
     _view = _window.getDefaultView();
 
@@ -142,26 +154,12 @@ int Grid::initialize() {
     _cell_vertexes.setPrimitiveType(sf::Points);
     _gridline_vertexes.setPrimitiveType(sf::Quads);
 
-    _chunk_texture.create(_chunk_size, _chunk_size);
+    _chunk_texture.create(CHUNK_SIZE, CHUNK_SIZE);
     _chunk_sprite.setTexture(_chunk_texture, true);
 
-    // texture stored in graphics memory where each pixel is a cell
-    int max_size = sf::Texture::getMaximumSize();
-    if (max_size < _grid_texture_width || max_size < _grid_texture_height) {
-        _grid_texture_width = max_size;
-        _grid_texture_height = max_size;
-    }
-    if (_grid_texture_width < _grid_texture_height)
-        _render_distance = _grid_texture_width / _chunk_size;
-    else
-        _render_distance = _grid_texture_height / _chunk_size;
+    _font.loadFromMemory(office_code_pro, office_code_pro_len);
 
-    _font.loadFromMemory(NotoSansMonoBoldTTF, NotoSansMonoBoldTTF_len);
-
-    _max_cells_x = _grid_texture_width - 2;
-    _max_cells_y = _grid_texture_height - 2;
-
-    _grid_render_texture.create(_grid_texture_width, _grid_texture_height);
+    _grid_render_texture.create(_grid_texture_size, _grid_texture_size);
     _grid_render_texture.clear(_background_color);
     _grid_render_texture.setRepeated(true);
     _grid_sprite.setTexture(_grid_render_texture.getTexture());
@@ -169,7 +167,7 @@ int Grid::initialize() {
     if (sf::Shader::isAvailable()) {
         _antialias_enabled = true;
         _shader.loadFromMemory(shader_source, sf::Shader::Fragment);
-        _shader.setUniform("geometry", sf::Vector2f(_grid_texture_width, _grid_texture_height));
+        _shader.setUniform("geometry", sf::Vector2f(_grid_texture_size, _grid_texture_size));
         _shader.setUniform("tex", _grid_render_texture.getTexture());
         _grid_render_texture.setSmooth(true);
     }

@@ -1,22 +1,19 @@
 #include "grid.h"
 #include <iostream>
-#include "robin_hood.h"
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
-
-// yes i know this needs to be cleaned up
-
-
-robin_hood::unordered_set<uint64_t> alive_cells;
+std::unordered_set<uint64_t> alive_cells;
 std::vector<uint64_t> cells_to_add;
 std::vector<uint64_t> cells_to_delete;
-robin_hood::unordered_map<uint64_t, int> neighbours;
+std::unordered_map<uint64_t, int> neighbours;
 
 bool paused = true;
 bool left_mouse_pressed = false;
 bool right_mouse_pressed = false;
 
-float speeds[5] = {1, 0.25, 0.05, 0.01, 0.001};
+float speeds[5] = {1, 0.25, 0.05, 0.01, 0};
 
 void Grid::onKeyPressEvent(int key_code) {
     switch (key_code) {
@@ -164,23 +161,13 @@ void Grid::onMouseReleaseEvent(int x, int y, int button) {
 }
 
 void Grid::onStartEvent() {
-    addText(8,  9, "GRID", _foreground_color, 0);
-
-    // for (int i = 0; i < 1000; i++) {
-    //     uint64_t idx = (uint64_t)i << 32;
-    //     drawCell(i, 0, _foreground_color);
-    //     addCell(idx);
-    // }
+    addText(4,  5, "GRID", _foreground_color, 0);
 
     int speed_idx = 2;
     setTimer(speeds[speed_idx]);
 }
 
 int main() {
-    Grid grid("Grid", 20, 19, 40);
-    // grid.setGridThickness(6);
-    // grid.useAntialiasing(false);
-    // grid.setGridlinesFade(0, 0);
-    // grid.setGridlineAlpha(50);
+    Grid grid("Grid", 12, 11, 69);
     return grid.start();
 }
