@@ -117,15 +117,11 @@ void Grid::onMouseScroll(int wheel, float delta) {
         _zoom_x = _mouse_x;
         _zoom_y = _mouse_y;
 
-		float zoom_rate = 1.0;
+        if (_scale < _min_scale * (1 + _decel_distance/4) && delta < 0 && _zoom_vel <= 0
+                || _scale > _max_scale / (1 + _decel_distance/4) && delta > 0 && _zoom_vel >= 0)
+            return;
 
-		if (_scale < _min_scale * (1 + _decelerate_out_space) && delta < 0)
-			zoom_rate = decelerateOut(0);
-
-		else if (_scale > _max_scale / (1 + _decelerate_in_space) && delta > 0 && _zoom_vel >= 0)
-			zoom_rate = pow(decelerateIn(0), 3);
-
-		_zoom_vel += delta * _zoom_speed * zoom_rate;
+        _zoom_vel += delta * _zoom_speed;
 
         if (_zoom_vel < -_max_zoom_vel)
             _zoom_vel = -_max_zoom_vel;

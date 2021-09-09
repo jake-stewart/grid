@@ -24,11 +24,13 @@ void Grid::applyZoomVel(float delta_time) {
 
         float zoom_rate = 1.0;
 
-        if (_scale < _min_scale * (1 + _decelerate_out_space) && _zoom_vel < 0)
+        if (_scale < _min_scale * (1 + _decel_distance) && _zoom_vel < 0) {
             zoom_rate = decelerateOut(delta_time);
+        }
 
-        else if (_scale > _max_scale / (1 + _decelerate_in_space) && _zoom_vel > 0)
+        else if (_scale > _max_scale / (1 + _decel_distance) && _zoom_vel > 0) {
             zoom_rate = decelerateIn(delta_time);
+        }
 
         zoom(1.0 + _zoom_vel * zoom_rate * delta_time, _zoom_x, _zoom_y);
 
@@ -37,26 +39,17 @@ void Grid::applyZoomVel(float delta_time) {
     }
 }
 float Grid::decelerateOut(float delta_time) {
-    float difficulty = 1 - log10(
-        (_min_scale * (1 + _decelerate_out_space) - _min_scale) /
-        (_scale - _min_scale)
-    );
-
-    if (isnan(difficulty) || difficulty < 0 || difficulty > 1)
-        return 0;
+    float end = _min_scale * (1 + _decel_distance);
+    float progress = (_scale - end) / (_min_scale - end);
+    float difficulty = 1.0 - pow(progress, _decel_rate);
 
     return difficulty;
 }
 
 float Grid::decelerateIn(float delta_time) {
-    float start = _max_scale / (1 + _decelerate_in_space);
-    float difficulty = -log10(
-        (_scale - start + (_max_scale - start) / 10) /
-        (_max_scale - start)
-    );
-
-    if (isnan(difficulty) || difficulty < 0 || difficulty > 1)
-        return 0;
+    float start = _max_scale / (1 + _decel_distance);
+    float progress = (_scale - start) / (_max_scale - start);
+    float difficulty = 1.0 - pow(progress, _decel_rate);
 
     return difficulty;
 }

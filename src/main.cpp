@@ -42,8 +42,9 @@ void Grid::onKeyPressEvent(int key_code) {
 void Grid::onKeyReleaseEvent(int key_code) {
 }
 
-const uint64_t DY = 0x100000000;
-const uint64_t DX = 0x1;
+const uint64_t OFFSET = 0x80000000;
+const uint64_t DX = 0x100000000;
+const uint64_t DY = 0x1;
 
 inline void addCell(uint64_t idx) {
     // when a new cell is introduced,
@@ -94,12 +95,12 @@ void Grid::onTimerEvent(int n_iterations) {
 
         for (auto it: cells_to_add) {
             addCell(it);
-            threadDrawCell(it >> 32, it, _foreground_color);
+            threadDrawCell((it >> 32) - OFFSET, it - OFFSET, _foreground_color);
         }
 
         for (auto it: cells_to_delete) {
             deleteCell(it);
-            threadDrawCell(it >> 32, it, _background_color);
+            threadDrawCell((it >> 32) - OFFSET, it - OFFSET, _background_color);
         }
 
         if (_timer.getElapsedTime().asSeconds() > _frame_duration * 3)
@@ -110,7 +111,7 @@ void Grid::onTimerEvent(int n_iterations) {
 void Grid::onMouseDragEvent(int x, int y) {
     if (!paused) return;
 
-    uint64_t idx = (uint64_t)x << 32 | (uint32_t)y;
+    uint64_t idx = uint64_t(x + OFFSET) << 32 | (y + OFFSET) & 0xffffffff;
     bool alive = alive_cells.find(idx) != alive_cells.end();
 
     if (left_mouse_pressed) {
@@ -130,7 +131,7 @@ void Grid::onMouseDragEvent(int x, int y) {
 }
 
 void Grid::onMousePressEvent(int x, int y, int button) {
-    uint64_t idx = (uint64_t)x << 32 | (uint32_t)y;
+    uint64_t idx = uint64_t(x + OFFSET) << 32 | (y + OFFSET) & 0xffffffff;
     bool alive = alive_cells.find(idx) != alive_cells.end();
 
     if (button == sf::Mouse::Left) {

@@ -25,7 +25,7 @@ void Grid::render() {
 
     _grid_sprite.setPosition(_blit_x_offset, _blit_y_offset);
 
-    if (_antialias_enabled && _scale > 1) {
+    if (_antialias_enabled) {
         _shader.setUniform("scale", _scale);
         _window.draw(_grid_sprite, &_shader);
     }
