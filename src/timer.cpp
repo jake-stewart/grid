@@ -147,7 +147,7 @@ void Grid::incrementTimer() {
 
 
     _n_iterations = (_timer_interval == 0)
-        ? (unsigned int)-1
+        ? 10000
         : round(_timer.getElapsedTime().asSeconds() / _timer_interval);
 
     _timer.restart();

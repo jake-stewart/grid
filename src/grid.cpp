@@ -82,7 +82,7 @@ Grid::Grid(const char * title, int n_cols, int n_rows, float scale) {
     _max_zoom_vel = 10.0;
 
     _decelerate_out_space = 1.0;
-    _decelerate_in_space = 0.4;
+    _decelerate_in_space = 0.3;
 
     // default
     //_foreground_color = sf::Color{0x54, 0x5d, 0x66};

@@ -99,7 +99,7 @@ int Grid::start() {
 
 void Grid::setFPS(int fps) {
 	if (fps) _frame_duration = 1.0 / fps;
-  else _frame_duration = 0;
+    else _frame_duration = 0;
 	_window.setFramerateLimit(fps);
 }
 
