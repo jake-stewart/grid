@@ -187,8 +187,8 @@ private:
     float _max_scale;
     float _min_scale;
     float _min_scale_cap;
-    float _decelerate_out_space;
-    float _decelerate_in_space;
+    float _decel_distance;
+    float _decel_rate;
 
     float _zoom_vel = 0;
     int _zoom_x = 0;
