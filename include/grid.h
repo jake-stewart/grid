@@ -2,9 +2,39 @@
 #define GRID_H
 
 #include <SFML/Graphics.hpp>
-#include <unordered_map>
 #include <vector>
-#include <math.h>
+#include <string>
+#include <unordered_map>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+
+
+const static int CHUNK_SIZE = 256;
+
+
+enum ThreadState {
+    inactive,
+    active,
+    swapping,
+    swapped,
+    joining
+};
+
+struct QueuedCell
+{
+    int x;
+    int y;
+    sf::Color color;
+};
+
+struct Letter
+{
+    char letter;
+    sf::Color color;
+    int style;
+};
+
 
 struct Coord
 {
@@ -24,6 +54,12 @@ struct Coord
     }
 };
  
+struct Chunk
+{
+    sf::Uint8 pixels [CHUNK_SIZE * CHUNK_SIZE * 4];
+    std::unordered_map<uint64_t, Letter> letters;
+};
+
 // The specialized hash function for `unordered_map` keys
 struct hash_fn
 {
@@ -48,8 +84,18 @@ public:
     // interface.cpp
     Grid(const char * title, int n_cols, int n_rows, float scale);
     int start();
+    void setFPS(int fps);
     void drawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g);
     void drawCell(int x, int y, sf::Color color);
+
+    void threadDrawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g);
+    void threadDrawCell(int x, int y, sf::Color color);
+    void drawCellQueue();
+
+    int _queue_max_idx = 0;
+    int _current_queue_idx = 0;
+    std::vector<QueuedCell> _cell_draw_queue;
+
     sf::Color getCell(int x, int y);
     void setScale(float scale);
     void setGridThickness(float value);
@@ -63,11 +109,16 @@ public:
     void drawCell(int x, int y, sf::Color, float anim_duration);
 
 private:
-    bool _stress_test;
-
-    int _chunk_size;
     int _grid_fading;
     float _grid_fade_duration;
+
+    std::thread _thread;
+    std::mutex _mutex;
+    std::condition_variable _cv;
+    ThreadState _thread_state = inactive;
+
+    bool _kill_thread = false;
+    bool _thread_running = false;
 
     bool _antialias_enabled;
 
@@ -79,8 +130,7 @@ private:
 
     int _max_chunk;
 
-    int _grid_texture_width;
-    int _grid_texture_height;
+    int _grid_texture_size;
     int _max_cells_x;
     int _max_cells_y;
 
@@ -88,26 +138,24 @@ private:
     int _pan_button = -1;
     bool _pan_button_pressed = false;
 
-    bool _left_mouse_pressed = false;
-    bool _right_mouse_pressed = false;
-
     // TODO: rename
     int _fill_x;
+    bool _mouse_moved = false;
     int _mouse_cell_x = 0;
     int _mouse_cell_y = 0;
 
+    bool _screen_changed = true;
+
     // last mouse location on screen
+    int _new_mouse_x = 0;
+    int _new_mouse_y = 0;
     int _mouse_x = 0;
     int _mouse_y = 0;
 
-    // visible row geometry
-    int _n_visible_rows = 0;
-    int _n_visible_cols = 0;
     int _screen_width;
     int _screen_height;
 
-    int _max_fps;
-    int _n_frames = 0;
+    float _frame_duration;
 
     // screen's top left corner coordinates of grid
     int _cam_x = 0;
@@ -135,42 +183,53 @@ private:
 
     bool _grid_moved;
 
-    // how zoomed in grid is. eg. scale 1.5 means each cell is 1.5 pixels.
-    // min and max scale determine cell size limits. cell size < 1 is possible but
-    // causes jitteriness when panning (also very computationally expensive because
-    // of how many cells have to be drawn)
     float _scale;
     float _max_scale;
     float _min_scale;
+    float _min_scale_cap;
+    float _decel_distance;
+    float _decel_rate;
 
     float _zoom_vel = 0;
     int _zoom_x = 0;
     int _zoom_y = 0;
 
     float _zoom_friction;
+    float _heavy_zoom_friction;
     float _zoom_speed;
+    float _pan_speed;
     float _min_zoom_vel;
+    float _max_zoom_vel;
 
-    // when you zoom beyond the min/max cell size, the scale bounces back
-    // these are the values used for the bezier curve
-    float _zoom_bounce_p0;
-    float _zoom_bounce_p1;
-    float _zoom_bounce_p2;
-    float _zoom_bounce_t;
-    float _zoom_bounce_duration;
+    void updateChunkQueue();
+    void updateChunks();
+    void drawScreen();
 
-    // if you zoom in/out while the scale is bouncing back,
-    // the bezier curve will need to be recalculated
-    bool _zoom_bounce_broken = true;
+    sf::Texture _chunk_texture;
+    sf::Sprite _chunk_sprite;
 
-    // cells in grid are stored in both a rows and columns map
-    // this makes it more efficient when drawing entire rows and entire columns
-    // _rows[chunk_index][x] = {r, g, b, a}
-    // _column[chunk_index][y] = {r, g, b, a}
-    // when drawing a row or column, the chunks are iterated over, instead of individual rows.
-    // then, each cell of the chunk is iterated over. this allows for empty pixels to be ignored.
-    std::unordered_map<int, std::unordered_map<int, std::unordered_map<int, sf::Color>>> _columns;
-    std::unordered_map<int, std::unordered_map<int, std::unordered_map<int, sf::Color>>> _rows;
+    int _n_frames = 0;
+    int _n_iterations = 0;
+    int _render_distance;
+    int _chunk_x_cell = 0;
+    int _chunk_y_cell = 0;
+    int _chunk_x = 0;
+    int _chunk_y = 0;
+    int _n_chunks_width = 0;
+    int _n_chunks_height = 0;
+    std::unordered_map<uint64_t, Chunk> _chunks[2];
+    bool _buffer_idx = 0;
+    std::vector<std::pair<int, int>> _chunk_queue;
+
+    int _chunk_render_left = 0;
+    int _chunk_render_right = 0;
+    int _chunk_render_top = 0;
+    int _chunk_render_bottom = 0;
+
+    int _old_chunk_render_left = 0;
+    int _old_chunk_render_right = 0;
+    int _old_chunk_render_top = 0;
+    int _old_chunk_render_bottom = 0;
 
     // a pixel buffer for drawing rows/columns. these pixels are used to update the grid texture
     // the grid texture is located in graphics memory, so the pixels should not be edited directly,
@@ -203,29 +262,22 @@ private:
 
     // timer that keeps track of the user's timer.
     // each time this timer ticks, onTimer() is called
-    sf::Clock _clock, _timer;
+    sf::Clock _clock, _timer, _fps_clock;
     float _timer_interval;
+    bool _lagging = false;
+    bool _timer_active = false;
+    bool _thread_active;
 
     sf::Clock _mouse_timer;
-    float _t_per_mouse_pos;
-    static const int _n_mouse_positions = 4;
-    int _mouse_x_positions [_n_mouse_positions];
-    int _mouse_y_positions [_n_mouse_positions];
-    int _mouse_pos_idx = 0;
+    float _mouse_dt;
+    float _mouse_vel_x = 0;
+    float _mouse_vel_y = 0;
 
-    // grid texture stored on graphics card for quicker rendering
-    sf::RenderTexture _grid_texture;
-
-    sf::VertexArray _vertex_array;
-
-    // sprites simply wrap textures and are used for rendering instead
-    // of using the textures themselves.
+    sf::RenderTexture _grid_render_texture;
     sf::Sprite _grid_sprite;
 
-
-    void randomCircle(float center_x, float center_y, float radius, float density);
-
-
+    sf::VertexArray _cell_vertexes;
+    sf::VertexArray _gridline_vertexes;
 
     int initialize();
     void mainloop();
@@ -240,31 +292,31 @@ private:
     void renderGridlinesAA();
 
     // grid.cpp
+    sf::Font _font;
     void render();
-    void clearArea(int x, int y, int n_cols, int n_rows);
-    void calcGridSize();
-    void drawIntroducedCells();
-    void drawRows(int y, int n_rows, int x, int n_cols);
-    void drawColumns(int x, int n_cols);
-    void updateTexture(int blit_x, int blit_y, int n_rows, int n_cols);
+    void addText(int x, int y, std::string text, sf::Color color, int style);
+    void renderText();
 
     // events.cpp
     void handleEvents();
-    void onStart();
     void onResize(unsigned int new_width, unsigned int new_height);
-    void onKeyRelease(int key_code);
-    void onTimer();
     void onKeyPress(int key_code);
     void onWindowClose();
 
     // zoom.cpp
     void zoom(float factor, int x, int y);
     void applyZoomVel(float delta_time);
-    void createZoomBounce();
-    void applyZoomBounce(float delta_time);
+    float decelerateOut(float delta_time);
+    float decelerateIn(float delta_time);
 
     // timer.cpp
+    void startTimer();
+    void setTimer(float timer_interval);
+    void stopTimer();
     void incrementTimer();
+    void endThread();
+    void startThread();
+    void threadFunc();
 
     // pan.cpp
     void pan(float x, float y);
@@ -275,14 +327,22 @@ private:
     void onMousePress(int button);
     void onMouseRelease(int button);
     void onMouseScroll(int wheel, float delta);
-    void calculateTraversedCells(int target_x, int target_y);
-    void onMouseDrag(int cell_x, int cell_y);
-    void recordMousePos();
+    void calculateTraversedCells();
     void onPanButtonPress();
     void onPanButtonRelease();
 
     // animations.cpp
     void animateCells(float delta_time);
+    void finishAnimations();
+
+    // main.cpp
+    void onMouseDragEvent(int cell_x, int cell_y);
+    void onMousePressEvent(int x, int y, int button);
+    void onMouseReleaseEvent(int x, int y, int button);
+    void onKeyPressEvent(int key_code);
+    void onKeyReleaseEvent(int key_code);
+    void onStartEvent();
+    void onTimerEvent(int n_iterations);
 };
 
 #endif

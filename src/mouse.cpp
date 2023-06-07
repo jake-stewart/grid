@@ -2,31 +2,16 @@
 #include <iostream>
 #include "grid.h"
 
-void Grid::recordMousePos() {
-    // TODO: clean + comments
-    _mouse_timer.restart();
-    _mouse_x_positions[_mouse_pos_idx] = _mouse_x;
-    _mouse_y_positions[_mouse_pos_idx] = _mouse_y;
-    _mouse_pos_idx = (_mouse_pos_idx + 1) % _n_mouse_positions;
-}
-
 void Grid::onMouseMotion(int x, int y) {
-    if (_pan_button_pressed)
-        pan((_mouse_x - x) / _scale,
-            (_mouse_y - y) / _scale);
-
-    int mouse_cell_x = _cam_x + (int)floor((_mouse_x / _scale) + _cam_x_decimal);
-    int mouse_cell_y = _cam_y + (int)floor((_mouse_y / _scale) + _cam_y_decimal);
-
-    calculateTraversedCells(mouse_cell_x, mouse_cell_y);
-
-    _mouse_cell_x = mouse_cell_x;
-    _mouse_cell_y = mouse_cell_y;
-    _mouse_x = x;
-    _mouse_y = y;
+    _mouse_moved = true;
+    _new_mouse_x = x;
+    _new_mouse_y = y;
 }
 
-void Grid::calculateTraversedCells(int target_x, int target_y) {
+void Grid::calculateTraversedCells() {
+    int target_x = _chunk_x_cell + (int)floor(_mouse_x / _scale + _cam_x_decimal);
+    int target_y = _chunk_y_cell + (int)floor(_mouse_y / _scale + _cam_y_decimal);
+
     float angle = atan2(target_x - _mouse_cell_x, target_y - _mouse_cell_y);
     float x_vel = sin(angle);
     float y_vel = cos(angle);
@@ -70,7 +55,7 @@ void Grid::calculateTraversedCells(int target_x, int target_y) {
         if (cell_x == last_x && cell_y == last_y)
             continue;
 
-        onMouseDrag(cell_x, cell_y);
+        onMouseDragEvent(cell_x, cell_y);
 
         // if the cell jumped diagonally, we want to fill it in
         // whether we fill the cell on the x axis or y axis is important
@@ -79,9 +64,9 @@ void Grid::calculateTraversedCells(int target_x, int target_y) {
 
         if (last_x != cell_x && last_y != cell_y) {
             if (_fill_x)
-                onMouseDrag(last_x, cell_y);
+                onMouseDragEvent(last_x, cell_y);
             else
-                onMouseDrag(cell_x, last_y);
+                onMouseDragEvent(cell_x, last_y);
         }
         else
             _fill_x = last_y == cell_y;
@@ -89,36 +74,16 @@ void Grid::calculateTraversedCells(int target_x, int target_y) {
         last_x = cell_x;
         last_y = cell_y;
     }
-}
-
-void Grid::onMouseDrag(int cell_x, int cell_y) {
-    if (_left_mouse_pressed)
-        drawCell(cell_x, cell_y, _foreground_color, 0.15);
-
-    else if (_right_mouse_pressed)
-        drawCell(
-            cell_x, cell_y,
-            _background_color, 0.15
-        );
+    _mouse_cell_x = target_x;
+    _mouse_cell_y = target_y;
 }
 
 void Grid::onMousePress(int button) {
     if (button == _pan_button) {
         onPanButtonPress();
     }
-    else if (button == sf::Mouse::Left) {
-        int x = _cam_x + (int)floor((_mouse_x / _scale) + _cam_x_decimal);
-        int y = _cam_y + (int)floor((_mouse_y / _scale) + _cam_y_decimal);
-        _left_mouse_pressed = true;
 
-        drawCell(x, y, _foreground_color, 0.15);
-    }
-    else if (button == sf::Mouse::Right) {
-        int x = _cam_x + (int)floor((_mouse_x / _scale) + _cam_x_decimal);
-        int y = _cam_y + (int)floor((_mouse_y / _scale) + _cam_y_decimal);
-        _right_mouse_pressed = true;
-        drawCell(x, y, _background_color, 0.15);
-    }
+    else onMousePressEvent(_mouse_cell_x, _mouse_cell_y, button);
 }
 
 void Grid::onPanButtonPress() {
@@ -128,41 +93,39 @@ void Grid::onPanButtonPress() {
     // busy panning, it slows down quickly
     _pan_friction = _strong_pan_friction;
 
-    // clear old mouse positions
-    _mouse_pos_idx = 0;
-    for (int i = 0; i < _n_mouse_positions; i++) {
-        _mouse_x_positions[i] = _mouse_x;
-        _mouse_y_positions[i] = _mouse_y;
-    }
-}
+    _mouse_vel_x = 0;
+    _mouse_vel_y = 0;
+
+};
 
 void Grid::onPanButtonRelease() {
     _pan_button_pressed = false;
-
-    // set pan friction back to normal
     _pan_friction = _weak_pan_friction;
-
-    // calculate the velocity
-    int idx = (_mouse_pos_idx + 1) % _n_mouse_positions;
-    _pan_vel_x = (_mouse_x_positions[idx] - _mouse_x) / (_t_per_mouse_pos * _n_mouse_positions);
-    _pan_vel_y = (_mouse_y_positions[idx] - _mouse_y) / (_t_per_mouse_pos * _n_mouse_positions);
+    _pan_vel_x = (_mouse_vel_x * _pan_speed) / _scale;
+    _pan_vel_y = (_mouse_vel_y * _pan_speed) / _scale;
 }
 
 void Grid::onMouseRelease(int button) {
     if (button == _pan_button)
         onPanButtonRelease();
-
-    else if (button == sf::Mouse::Left)
-        _left_mouse_pressed = false;
-
-    else if (button == sf::Mouse::Right)
-        _right_mouse_pressed = false;
+    else
+        onMouseReleaseEvent(_mouse_cell_x, _mouse_cell_y, button);
 }
 
 void Grid::onMouseScroll(int wheel, float delta) {
     if (wheel == sf::Mouse::VerticalWheel) {
         _zoom_x = _mouse_x;
         _zoom_y = _mouse_y;
+
+        if (_scale < _min_scale * (1 + _decel_distance/4) && delta < 0 && _zoom_vel <= 0
+                || _scale > _max_scale / (1 + _decel_distance/4) && delta > 0 && _zoom_vel >= 0)
+            return;
+
         _zoom_vel += delta * _zoom_speed;
+
+        if (_zoom_vel < -_max_zoom_vel)
+            _zoom_vel = -_max_zoom_vel;
+        else if (_zoom_vel > _max_zoom_vel)
+            _zoom_vel = _max_zoom_vel;
     }
 }

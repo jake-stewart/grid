@@ -1,28 +1,27 @@
 #include <SFML/Graphics.hpp>
-#include <iostream>
 #include <unordered_map>
 #include <math.h>
+#include <iostream>
 #include "grid.h"
 
-#define ADD_VERTEX(x, y, color) _vertex_array.append(sf::Vertex({x, y}, color))
+#define ADD_VERTEX(x, y, color) _cell_vertexes.append(sf::Vertex({x, y}, color))
 
 using std::unordered_map;
 
 
-
 void Grid::render() {
-    _grid_texture.display();
+    _grid_render_texture.display();
     _grid_sprite.setScale(_scale, _scale);
 
     _grid_sprite.setTextureRect({
-        _cam_x % _grid_texture_width,
-        _cam_y % _grid_texture_height,
-        _n_visible_cols,
-        _n_visible_rows 
+        (_chunk_x * CHUNK_SIZE) % _grid_texture_size,
+        (_chunk_y * CHUNK_SIZE) % _grid_texture_size,
+        _render_distance * CHUNK_SIZE,
+        _render_distance * CHUNK_SIZE 
     });
 
-    _blit_x_offset = (-1 + (1 - _cam_x_decimal)) * _scale;
-    _blit_y_offset = (-1 + (1 - _cam_y_decimal)) * _scale;
+    _blit_x_offset = (-CHUNK_SIZE + (CHUNK_SIZE - _cam_x_decimal)) * _scale;
+    _blit_y_offset = (-CHUNK_SIZE + (CHUNK_SIZE - _cam_y_decimal)) * _scale;
 
     _grid_sprite.setPosition(_blit_x_offset, _blit_y_offset);
 
@@ -34,209 +33,200 @@ void Grid::render() {
     else _window.draw(_grid_sprite);
 }
 
-void Grid::drawIntroducedCells() {
-    int old_col_start = _col_start;
-    int old_col_end = _col_end;
-    int old_row_start = _row_start;
-    int old_row_end = _row_end;
+void Grid::renderText() {
+    int character_size;
 
-    // 1 is added, since half of two cells could be visible
-    _n_visible_cols = ceil(_screen_width / _scale) + 1;
-    _n_visible_rows = ceil(_screen_height / _scale) + 1;
+    if (_scale < 5) return;
+    else if (_scale < 7) character_size = 7;
+    else if (_scale < 13) character_size = 13;
+    else if (_scale < 22) character_size = 22;
+    else if (_scale < 40) character_size = 40;
+    else if (_scale < 69) character_size = 69;
+    else if (_scale < 160) character_size = 160;
+    else character_size = 300;
 
-    _col_start = _cam_x;
-    _row_start = _cam_y;
-    _col_end = _col_start + _n_visible_cols;
-    _row_end = _row_start + _n_visible_rows;
+    int alpha = (_scale < 11)
+        ? alpha = ((_scale - 5) / (11 - 5)) * 255
+        : 255;
 
-    int n_cols_drawn_right = _col_end - old_col_end;
-    int n_rows_drawn_bottom = _row_end - old_row_end;
-    int n_cols_drawn_left = old_col_start - _col_start;
-    int n_rows_drawn_top = old_row_start - _row_start;
+    float increased_scale = _scale / character_size;
 
-    bool draw_entire_screen = (
-        abs(n_cols_drawn_left) > _n_visible_cols ||
-        abs(n_rows_drawn_top) > _n_visible_rows
-    );
+    sf::Text text;
+    text.setFont(_font);
+    text.scale(increased_scale, increased_scale);
+    text.setCharacterSize(character_size);
 
 
-    if (draw_entire_screen) {
-        clearArea(
-            _cam_x - 1, _cam_y - 1,
-            _n_visible_cols + 2, _n_visible_rows + 2
-        );
-        drawColumns(_cam_x, _n_visible_cols);
+    for (int chunk_x = _chunk_x; chunk_x <= _chunk_x + _n_chunks_width; chunk_x++) {
+        for (int chunk_y = _chunk_y; chunk_y <= _chunk_y + _n_chunks_height; chunk_y++) {
+
+            uint64_t idx = (uint64_t)chunk_x << 32 | (uint32_t)chunk_y;
+            auto chunk = _chunks[_buffer_idx].find(idx);
+            if (chunk == _chunks[_buffer_idx].end())
+                continue;
+
+            for (auto it: chunk->second.letters) {
+                int x = it.first >> 32;
+                int y = (int)it.first;
+
+                float blit_x = (x - (_chunk_x * CHUNK_SIZE + _cam_x_decimal) + 0.2) * _scale;
+                float blit_y = (y - (_chunk_y * CHUNK_SIZE + _cam_y_decimal) - 0.15) * _scale;
+
+                text.setString(it.second.letter);
+                it.second.color.a = alpha;
+                text.setFillColor(it.second.color);
+                text.setStyle(it.second.style);
+                text.setPosition(blit_x, blit_y);
+                //text.setOrigin(text.getLocalBounds().left/2.0f,text.getLocalBounds().top);
+                _window.draw(text);
+            }
+        }
+    }
+}
+
+void Grid::updateChunkQueue() {
+    _n_chunks_width = ceil(_screen_width / (CHUNK_SIZE * _scale));
+    int spare_chunks_x = _render_distance - _n_chunks_width;
+    if (spare_chunks_x < 0) spare_chunks_x = 0;
+    int chunk_render_left = _chunk_x - spare_chunks_x / 2;
+    int chunk_render_right = chunk_render_left + _render_distance;
+
+    _n_chunks_height = ceil(_screen_height / (CHUNK_SIZE * _scale));
+    int spare_chunks_y = _render_distance - _n_chunks_height;
+    if (spare_chunks_y < 0) spare_chunks_y = 0;
+    int chunk_render_top = _chunk_y - spare_chunks_y / 2;
+    int chunk_render_bottom = chunk_render_top + _render_distance;
+
+    if (chunk_render_left == _chunk_render_left
+            && chunk_render_right == _chunk_render_right
+            && chunk_render_top == _chunk_render_top
+            && chunk_render_bottom == _chunk_render_bottom)
         return;
+
+    auto it = _chunk_queue.end();
+    while (it > _chunk_queue.begin()) {
+        it--;
+        if (it->first < chunk_render_left
+                || it->first >= chunk_render_right
+                || it->second < chunk_render_top
+                || it->second >= chunk_render_bottom)
+            it = _chunk_queue.erase(it);
     }
 
-    if (n_cols_drawn_left > 0) {
-        clearArea(
-            _col_start - 1, _cam_y - 1,
-            n_cols_drawn_left + 1, _n_visible_rows + 2
-        );
-        drawColumns(_col_start, n_cols_drawn_left);
-    }
-    else
-        n_cols_drawn_left = 0;
+    int x, y;
+    int n_left = 0;
+    int n_right = 0;
+    int n_top = 0;
+    int n_bottom = 0;
 
-    if (n_cols_drawn_right > 0) {
-        clearArea(
-            old_col_end, _cam_y - 1,
-            n_cols_drawn_right + 1, _n_visible_rows + 2
-        );
-        drawColumns(old_col_end, n_cols_drawn_right);
-    }
-    else
-        n_cols_drawn_right = 0;
-
-    int x = _col_start + n_cols_drawn_left;
-    int n_cols = _n_visible_cols - n_cols_drawn_left - n_cols_drawn_right;
-
-    if (n_rows_drawn_top > 0) {
-        clearArea(
-            x - 1, _row_start -1,
-            n_cols + 2, n_rows_drawn_top + 1
-        );
-        drawRows(
-            _row_start, n_rows_drawn_top,
-            x, n_cols
-        );
+    for (x = chunk_render_left; x < _chunk_render_left; x++) {
+        n_left++;
+        for (y = chunk_render_top; y < chunk_render_bottom; y++) {
+            _chunk_queue.push_back({x, y});
+        }
     }
 
-    if (n_rows_drawn_bottom > 0) {
-        clearArea(
-            x - 1, old_row_end,
-            n_cols + 2, n_rows_drawn_bottom + 1
-        );
-        drawRows(
-            old_row_end, n_rows_drawn_bottom,
-            x, n_cols
-        );
+    for (x = _chunk_render_right; x < chunk_render_right; x++) {
+        n_right++;
+        for (y = chunk_render_top; y < chunk_render_bottom; y++) {
+            _chunk_queue.push_back({x, y});
+        }
+    }
+
+    for (y = chunk_render_top; y < _chunk_render_top; y++) {
+        n_top++;
+        for (x = chunk_render_left + n_left; x < chunk_render_right - n_right; x++) {
+            _chunk_queue.push_back({x, y});
+        }
+    }
+
+    for (y = _chunk_render_bottom; y < chunk_render_bottom; y++) {
+        n_bottom++;
+        for (x = chunk_render_left + n_left; x < chunk_render_right - n_right; x++) {
+            _chunk_queue.push_back({x, y});
+        }
+    }
+
+    sf::RectangleShape rectangle;
+    rectangle.setFillColor(_background_color);
+
+    float blit_x, blit_y;
+
+    blit_x = (chunk_render_left * CHUNK_SIZE) % _grid_texture_size;
+    if (blit_x < 0) blit_x += _grid_texture_size;
+    rectangle.setPosition({blit_x, 0});
+    rectangle.setSize({(float)CHUNK_SIZE * n_left, (float)_render_distance * CHUNK_SIZE});
+    _grid_render_texture.draw(rectangle);
+
+    blit_x = (_chunk_render_right * CHUNK_SIZE) % _grid_texture_size;
+    if (blit_x < 0) blit_x += _grid_texture_size;
+    rectangle.setPosition({blit_x, 0});
+    rectangle.setSize({(float)CHUNK_SIZE * n_right, (float)_render_distance * CHUNK_SIZE});
+    _grid_render_texture.draw(rectangle);
+
+    blit_y = (chunk_render_top * CHUNK_SIZE) % _grid_texture_size;
+    if (blit_y < 0) blit_y += _grid_texture_size;
+    rectangle.setPosition({0, blit_y});
+    rectangle.setSize({(float)_render_distance * CHUNK_SIZE, (float)CHUNK_SIZE * n_top});
+    _grid_render_texture.draw(rectangle);
+
+    blit_y = (_chunk_render_bottom * CHUNK_SIZE) % _grid_texture_size;
+    if (blit_y < 0) blit_y += _grid_texture_size;
+    rectangle.setPosition({0, blit_y});
+    rectangle.setSize({(float)_render_distance * CHUNK_SIZE, (float)CHUNK_SIZE * n_bottom});
+    _grid_render_texture.draw(rectangle);
+
+    _chunk_render_left = chunk_render_left;
+    _chunk_render_right = chunk_render_right;
+    _chunk_render_top = chunk_render_top;
+    _chunk_render_bottom = chunk_render_bottom;
+}
+
+void Grid::updateChunks() {
+    if (!_chunk_queue.size())
+        return;
+
+    while (_chunk_queue.size()) {
+        uint64_t idx = (uint64_t)_chunk_queue[0].first << 32 | (uint32_t)_chunk_queue[0].second;
+
+        auto chunk = _chunks[_buffer_idx].find(idx);
+
+        if (chunk != _chunks[_buffer_idx].end()) {
+            int blit_x = (_chunk_queue[0].first * CHUNK_SIZE) % _grid_texture_size;
+            if (blit_x < 0) blit_x += _grid_texture_size;
+
+            int blit_y = (_chunk_queue[0].second * CHUNK_SIZE) % _grid_texture_size;
+            if (blit_y < 0) blit_y += _grid_texture_size;
+
+            _chunk_texture.update(chunk->second.pixels);
+            _chunk_sprite.setPosition(blit_x, blit_y);
+            _grid_render_texture.draw(_chunk_sprite);
+        }
+
+        _chunk_queue.erase(_chunk_queue.begin());
+        if (_clock.getElapsedTime().asSeconds() > _frame_duration)
+            break;
     }
 }
 
-void Grid::drawRows(int y, int n_rows, int x, int n_cols) {
-    int chunk_start_idx = x / _chunk_size;
-    int chunk_end_idx = (x + n_cols) / _chunk_size + 1;
+void Grid::drawScreen() {
+    _chunk_queue.clear();
 
-    for (int i = 0; i < n_rows; i++) {
-        auto row_iter = _rows.find(y);
+    int n_chunks_width = ceil(_screen_width / (CHUNK_SIZE * _scale));
+    int spare_chunks_x = _render_distance - n_chunks_width;
+    if (spare_chunks_x < 0) spare_chunks_x = 0;
+    int _chunk_render_left = _chunk_x - spare_chunks_x / 2;
+    int _chunk_render_right = _chunk_render_left + _render_distance;
 
-        float cell_y = y % _grid_texture_height + 0.5;
-        if (cell_y < 0) cell_y += _grid_texture_height;
+    int n_chunks_height = ceil(_screen_height / (CHUNK_SIZE * _scale));
+    int spare_chunks_y = _render_distance - n_chunks_height;
+    if (spare_chunks_y < 0) spare_chunks_y = 0;
+    int _chunk_render_top = _chunk_y - spare_chunks_y / 2;
+    int _chunk_render_bottom = _chunk_render_top + _render_distance;
 
-        if (row_iter != _rows.end()) {
-            for (int chunk_idx = chunk_start_idx; chunk_idx != chunk_end_idx; chunk_idx++) {
-                if (chunk_idx == _max_chunk) {
-                    chunk_idx = -_max_chunk;
-                }
-
-                auto chunk_iter = row_iter->second.find(chunk_idx);
-                if (chunk_iter == row_iter->second.end())
-                    continue;
-
-                for (auto& cell: chunk_iter->second) {
-                    if (_col_start > _col_end) {
-                        int a = cell.first + _n_visible_cols * 2;
-                        int b = x + _n_visible_cols * 2;
-                        int c = b + n_cols;
-                        if (a < b || a >= c)
-                            continue;
-                    }
-                    else if (cell.first < x || cell.first >= x + n_cols)
-                        continue;
-
-                    float cell_x = cell.first % _grid_texture_width + 0.5;
-                    if (cell_x < 0) cell_x += _grid_texture_width;
-                    ADD_VERTEX(cell_x, cell_y, cell.second);
-                }
-            }
+    for (int x = _chunk_render_left; x < _chunk_render_right; x++) {
+        for (int y = _chunk_render_top; y < _chunk_render_bottom; y++) {
+            _chunk_queue.push_back({x, y});
         }
-        y++;
-    }
-}
-
-void Grid::drawColumns(int x, int n_cols) {
-    int chunk_start_idx = _cam_y / _chunk_size;
-    int chunk_end_idx = (_cam_y + _n_visible_rows) / _chunk_size + 1;
-
-    for (int i = 0; i < n_cols; i++) {
-        auto col_iter = _columns.find(x);
-
-        float cell_x = x % _grid_texture_width + 0.5;
-        if (cell_x < 0) cell_x += _grid_texture_width;
-
-        if (col_iter != _columns.end()) {
-            for (int chunk_idx = chunk_start_idx; chunk_idx != chunk_end_idx; chunk_idx++) {
-                if (chunk_idx == _max_chunk) chunk_idx = -_max_chunk;
-
-                auto chunk_iter = col_iter->second.find(chunk_idx);
-                if (chunk_iter == col_iter->second.end())
-                    continue;
-
-                for (auto& cell: chunk_iter->second) {
-                    if (_row_start > _row_end) {
-                        int a = cell.first + _n_visible_rows * 2;
-                        int b = _cam_y + _n_visible_rows * 2;
-                        int c = b + _n_visible_rows;
-                        if (a < b || a >= c) {
-                            continue;
-                        }
-                    }
-                    else {
-                        if (cell.first < _cam_y || cell.first >= _cam_y + _n_visible_rows) {
-                            continue;
-                        }
-                    }
-                    float cell_y = cell.first % _grid_texture_height + 0.5;
-                    if (cell_y < 0) cell_y += _grid_texture_height;
-                    ADD_VERTEX(cell_x, cell_y, cell.second);
-                }
-            }
-        }
-        x++;
-    }
-}
-
-
-void Grid::clearArea(int x, int y, int n_cols, int n_rows) {
-    x %= _grid_texture_width;
-    if (x < 0) x += _grid_texture_width;
-
-    y %= _grid_texture_height;
-    if (y < 0) y += _grid_texture_height;
-
-    sf::RectangleShape rect;
-    rect.setFillColor(_background_color);
-
-    int start_y = y;
-    int start_n_rows = n_rows;
-
-    while (n_cols) {
-        float cols_fit;
-        if (x + n_cols > _grid_texture_width)
-            cols_fit = _grid_texture_width - x;
-        else
-            cols_fit = n_cols;
-
-        y = start_y;
-        n_rows = start_n_rows;
-        while (n_rows) {
-            float rows_fit;
-            if (y + n_rows > _grid_texture_height)
-                rows_fit = _grid_texture_height - y;
-            else
-                rows_fit = n_rows;
-
-            rect.setPosition(x, y);
-            rect.setSize({cols_fit, rows_fit});
-            _grid_texture.draw(rect);
-
-            n_rows -= rows_fit;
-            y = 0;
-        }
-
-        n_cols -= cols_fit;
-        x = 0;
     }
 }

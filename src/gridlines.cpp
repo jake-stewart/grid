@@ -1,7 +1,8 @@
 #include <SFML/Graphics.hpp>
+#include <math.h>
 #include "grid.h"
 
-#define ADD_VERTEX(x, y, color) _vertex_array.append(sf::Vertex({x, y}, color))
+#define ADD_VERTEX(x, y, color) _gridline_vertexes.append(sf::Vertex({x, y}, color))
 
 void Grid::applyGridEffects() {
     // if cells have not begun fading in yet, or gridlines are disabled,
@@ -58,9 +59,8 @@ void Grid::renderGridlines() {
     }
 
     // draw the vertices, with the constructed column line texture
-    _vertex_array.setPrimitiveType(sf::Quads);
-    _window.draw(_vertex_array);
-    _vertex_array.clear();
+    _window.draw(_gridline_vertexes);
+    _gridline_vertexes.clear();
 }
 
 void Grid::renderGridlinesAA() {
@@ -111,9 +111,8 @@ void Grid::renderGridlinesAA() {
         ADD_VERTEX((float)_screen_width, _end_offset,       _aa_color_r);
     }
 
-    _vertex_array.setPrimitiveType(sf::Quads);
-    _window.draw(_vertex_array);
-    _vertex_array.clear();
+    _window.draw(_gridline_vertexes);
+    _gridline_vertexes.clear();
 }
 
 void Grid::calcGridlineAA(float p) {

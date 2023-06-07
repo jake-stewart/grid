@@ -40,24 +40,11 @@ void Grid::handleEvents() {
                 break;
 
             case sf::Event::KeyReleased:
-                onKeyRelease(event.key.code);
+                onKeyReleaseEvent(event.key.code);
                 break;
 
             default:
                 break;
-        }
-    }
-}
-
-void Grid::onStart() {
-    for (int y = 5; y < 100; y += 5) {
-        for (int x = 0; x < 100; x += 1) {
-            drawCell(x, y, _foreground_color);
-        }
-    }
-    for (int x = 5; x < 100; x += 5) {
-        for (int y = 0; y < 100; y += 1) {
-            drawCell(x, y, _foreground_color);
         }
     }
 }
@@ -70,47 +57,24 @@ void Grid::onResize(unsigned int new_width, unsigned int new_height) {
     _view.setCenter(new_width / 2.0, new_height / 2.0);
     _window.setView(_view);
 
-    // cell coords at middle of screen, relative to top left
-    float middle_x = _cam_x + (_screen_width / 2.0) / _scale;
-    float middle_y = _cam_y + (_screen_height / 2.0) / _scale;
-
     _screen_width = new_width;
     _screen_height = new_height;
 
-    // setScale() will increase the grid's scale if the grid texture
-    // is too small
+    float min_scale_width = (float)_screen_width / (CHUNK_SIZE * (_render_distance - 1));
+    float min_scale_height = (float)_screen_height / (CHUNK_SIZE * (_render_distance - 1));
+
+    float smallest_scale = (min_scale_width > min_scale_height)
+        ? min_scale_width
+        : min_scale_height;
+
+    _min_scale = (smallest_scale < _min_scale_cap) ? _min_scale_cap : smallest_scale;
+
     setScale(_scale);
-
-    // new cell coords at middle of screen, relative to top left
-    float new_middle_x = _cam_x + (_screen_width / 2.0) / _scale;
-    float new_middle_y = _cam_y + (_screen_height / 2.0) / _scale;
-
-    // make sure the old middle cell is still in the middle of the screen
-    pan(middle_x - new_middle_x, middle_y - new_middle_y);
-}
-
-void Grid::onKeyRelease(int key_code) {
 }
 
 void Grid::onKeyPress(int key_code) {
     switch (key_code)
     {
-        case sf::Keyboard::Up:
-			pan(0, 0.01);
-            break;
-
-        case sf::Keyboard::Down:
-			pan(0, -0.01);
-            break;
-
-        case sf::Keyboard::Left:
-			pan(-0.01, 0);
-            break;
-
-        case sf::Keyboard::Right:
-			pan(0.01, 0);
-            break;
-        
         case sf::Keyboard::F:
             useAntialiasing(!_antialias_enabled);
             break;
@@ -120,16 +84,12 @@ void Grid::onKeyPress(int key_code) {
             break;
 
         default:
+            onKeyPressEvent(key_code);
             break;
     }
 }
 
 void Grid::onWindowClose() {
+    endThread();
     _window.close();
-}
-
-void Grid::onTimer() {
-    // if (_stress_test)
-        std::cout << "FPS: " << _n_frames << std::endl;
-    _n_frames = 0;
 }

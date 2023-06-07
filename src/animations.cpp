@@ -1,7 +1,6 @@
 #include <SFML/Graphics.hpp>
 #include "grid.h"
 #include <unordered_map>
-#include <iostream>
 
 using std::unordered_map;
 
@@ -13,6 +12,17 @@ sf::Color colorMix(sf::Color a, sf::Color b, float perc) {
         sf::Uint8(a.g * perc + b.g * alt_perc),
         sf::Uint8(a.b * perc + b.b * alt_perc)
     };
+}
+
+void Grid::finishAnimations() {
+    for (auto it: _animated_cells) {
+        drawCell(
+            it.first.x,
+            it.first.y,
+            it.second.end_color
+        );
+    }
+    _animated_cells.clear();
 }
 
 void Grid::animateCells(float delta_time) {
