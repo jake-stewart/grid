@@ -12,6 +12,7 @@ void Grid::setScale(float scale) {
 		_scale = _min_scale;
     else
         _scale = scale;
+
     applyGridEffects();
 }
 
@@ -48,6 +49,10 @@ void Grid::toggleGridlines() {
 void Grid::useAntialiasing(bool value) {
     _antialias_enabled = value;
     _grid_render_texture.setSmooth(_antialias_enabled);
+}
+
+void Grid::setAntialiasingLevel(unsigned int level) {
+    _antialias_level = level;
 }
 
 void Grid::setGridThickness(float value) {

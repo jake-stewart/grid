@@ -44,23 +44,30 @@ void Grid::renderGridlines() {
     float start_y = _blit_y_offset - t / 2;
     float start_x = _blit_x_offset - t / 2;
 
+    sf::Color opaque = _gridline_color;
+    opaque.a = 255;
+
     for (float y = start_y; y < _screen_height; y += _scale) {
-        ADD_VERTEX(0,                    y,     _gridline_color);
-        ADD_VERTEX(0,                    y + t, _gridline_color);
-        ADD_VERTEX((float)_screen_width, y + t, _gridline_color);
-        ADD_VERTEX((float)_screen_width, y,     _gridline_color);
+        ADD_VERTEX(0,                    y,     opaque);
+        ADD_VERTEX(0,                    y + t, opaque);
+        ADD_VERTEX((float)_screen_width, y + t, opaque);
+        ADD_VERTEX((float)_screen_width, y,     opaque);
     }
 
     for (float x = start_x; x < _screen_width; x += _scale) {
-        ADD_VERTEX(x,     0,                     _gridline_color);
-        ADD_VERTEX(x + t, 0,                     _gridline_color);
-        ADD_VERTEX(x + t, (float)_screen_height, _gridline_color);
-        ADD_VERTEX(x,     (float)_screen_height, _gridline_color);
+        ADD_VERTEX(x,     0,                     opaque);
+        ADD_VERTEX(x + t, 0,                     opaque);
+        ADD_VERTEX(x + t, (float)_screen_height, opaque);
+        ADD_VERTEX(x,     (float)_screen_height, opaque);
     }
 
-    // draw the vertices, with the constructed column line texture
-    _window.draw(_gridline_vertexes);
+    _gridline_render_texture.clear(sf::Color::Transparent);
+    _gridline_render_texture.draw(_gridline_vertexes, sf::BlendMax);
+    _gridline_render_texture.display();
     _gridline_vertexes.clear();
+
+    _gridline_sprite.setColor(sf::Color(255, 255, 255, _gridline_color.a));
+    _window.draw(_gridline_sprite);
 }
 
 void Grid::renderGridlinesAA() {
@@ -111,8 +118,13 @@ void Grid::renderGridlinesAA() {
         ADD_VERTEX((float)_screen_width, _end_offset,       _aa_color_r);
     }
 
-    _window.draw(_gridline_vertexes);
+    _gridline_render_texture.clear(sf::Color::Transparent);
+    _gridline_render_texture.draw(_gridline_vertexes, sf::BlendMax);
+    _gridline_render_texture.display();
     _gridline_vertexes.clear();
+
+    _gridline_sprite.setColor(sf::Color(255, 255, 255, 255));
+    _window.draw(_gridline_sprite);
 }
 
 void Grid::calcGridlineAA(float p) {

@@ -60,6 +60,9 @@ void Grid::onResize(unsigned int new_width, unsigned int new_height) {
     _screen_width = new_width;
     _screen_height = new_height;
 
+    _gridline_render_texture.create(_screen_width, _screen_height);
+    _gridline_sprite.setTexture(_gridline_render_texture.getTexture(), true);
+
     float min_scale_width = (float)_screen_width / (CHUNK_SIZE * (_render_distance - 1));
     float min_scale_height = (float)_screen_height / (CHUNK_SIZE * (_render_distance - 1));
 

@@ -103,6 +103,7 @@ public:
     void setGridlineAlpha(int alpha);
     void toggleGridlines();
     void useAntialiasing(bool value);
+    void setAntialiasingLevel(unsigned int level);
 
     // animations.cpp
     void drawCell(int x, int y, sf::Uint8 r, sf::Uint8 b, sf::Uint8 g, float anim_duration);
@@ -120,7 +121,13 @@ private:
     bool _kill_thread = false;
     bool _thread_running = false;
 
+    float _t_per_mouse_pos = 0.01;
+    int _max_fps = 69;
+
+    bool _gridlines_aa;
+
     bool _antialias_enabled;
+    unsigned int _antialias_level;
 
     const char * _title;
 
@@ -275,6 +282,9 @@ private:
 
     sf::RenderTexture _grid_render_texture;
     sf::Sprite _grid_sprite;
+
+    sf::RenderTexture _gridline_render_texture;
+    sf::Sprite _gridline_sprite;
 
     sf::VertexArray _cell_vertexes;
     sf::VertexArray _gridline_vertexes;

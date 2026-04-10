@@ -79,7 +79,8 @@ void Grid::calculateTraversedCells() {
 }
 
 void Grid::onMousePress(int button) {
-    if (button == _pan_button) {
+    if (button == _pan_button ||
+            (button == sf::Mouse::Left && sf::Keyboard::isKeyPressed(sf::Keyboard::LShift))) {
         onPanButtonPress();
     }
 
@@ -106,7 +107,7 @@ void Grid::onPanButtonRelease() {
 }
 
 void Grid::onMouseRelease(int button) {
-    if (button == _pan_button)
+    if (_pan_button_pressed)
         onPanButtonRelease();
     else
         onMouseReleaseEvent(_mouse_cell_x, _mouse_cell_y, button);
